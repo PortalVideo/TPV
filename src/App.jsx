@@ -33,7 +33,7 @@ async function sbAuth(action, body) {
 }
 
 const SHOOT_TYPES = ["חתונות / אירועים", "תוכן לרשתות חברתיות", "פרסומות / קומרשיאל", "קליפים מוזיקליים", "תדמית לעסקים", "אחר"];
-const initialForm = { date: "", clientName: "", location: "", phone: "05", price: "", deposit: "", type: "חתונות / אירועים", notes: "", calendarEventId: null };
+const initialForm = { date: "", clientName: "", location: "", phone: "05", price: "", deposit: "", type: "חתונות / אירועים", notes: "", calendarEventId: null, package: null, drone: false, vintage: false };
 
 function fmt(n) { return Number(n || 0).toLocaleString("he-IL") + " ₪"; }
 function getCurrentMonth() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; }
@@ -245,7 +245,7 @@ export default function App() {
     setLoading(true);
     try{
       const [s,e]=await Promise.all([sbFetch("shoots?order=date.desc",{},authToken),sbFetch("expenses?order=created_at.desc",{},authToken)]);
-      setShoots((s||[]).map(r=>({id:r.id,date:r.date,clientName:r.client_name,phone:r.phone||"",type:r.type,location:r.location||"",price:r.price,deposit:r.deposit||0,paymentStatus:r.payment_status||"לא שולם",notes:r.notes||"",calendarEventId:r.calendar_event_id})));
+      setShoots((s||[]).map(r=>({id:r.id,date:r.date,clientName:r.client_name,phone:r.phone||"",type:r.type,location:r.location||"",price:r.price,deposit:r.deposit||0,paymentStatus:r.payment_status||"לא שולם",notes:r.notes||"",calendarEventId:r.calendar_event_id,package:r.package||null,drone:r.drone||false,vintage:r.vintage||false})));
       setExpenses((e||[]).map(r=>({id:r.id,month:r.month,description:r.description,amount:r.amount})));
     }catch(err){ console.error('load error',err); }
     setLoading(false);
@@ -300,14 +300,14 @@ export default function App() {
       if(gcalToken){ if(calId) await gcalUpdate({...form,calendarEventId:calId}); else calId=await gcalCreate(form); }
       const updated={...form,id:editId,calendarEventId:calId};
       try{
-        await sbFetch(`shoots?id=eq.${editId}`,{method:"PATCH",body:JSON.stringify({date:form.date,client_name:form.clientName,phone:form.phone,type:form.type,location:form.location,price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,payment_status:form.paymentStatus||"לא שולם",notes:form.notes,calendar_event_id:calId})},authToken);
+        await sbFetch(`shoots?id=eq.${editId}`,{method:"PATCH",body:JSON.stringify({date:form.date,client_name:form.clientName,phone:form.phone,type:form.type,location:form.location,price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,payment_status:form.paymentStatus||"לא שולם",notes:form.notes,calendar_event_id:calId,package:form.package||null,drone:form.drone||false,vintage:form.vintage||false})},authToken);
         setShoots(shoots.map(s=>s.id===editId?updated:s)); showToast("עודכן ✓"); setModal(null); setView("history");
       }catch{ showToast("שגיאה","error"); return; }
       setEditId(null);
     } else {
       let calId=gcalToken?await gcalCreate(form):null;
       try{
-        const res=await sbFetch("shoots",{method:"POST",body:JSON.stringify({date:form.date,client_name:form.clientName,phone:form.phone,type:form.type,location:form.location,price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,payment_status:"לא שולם",notes:form.notes,calendar_event_id:calId})},authToken);
+        const res=await sbFetch("shoots",{method:"POST",body:JSON.stringify({date:form.date,client_name:form.clientName,phone:form.phone,type:form.type,location:form.location,price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,payment_status:"לא שולם",notes:form.notes,calendar_event_id:calId,package:form.package||null,drone:form.drone||false,vintage:form.vintage||false})},authToken);
         setShoots([{id:res[0].id,...form,paymentStatus:"לא שולם",calendarEventId:calId},...shoots]);
         showToast(gcalToken&&calId?"נשמר + לוח שנה ✓":"נשמר ✓"); setModal(null);
       }catch{ showToast("שגיאה","error"); return; }
@@ -463,7 +463,7 @@ export default function App() {
                 {icon:Icon.newEvent, label:"אירוע חדש", action:()=>{setForm(initialForm);setEditId(null);setModal("new-event");}},
                 {icon:Icon.expense, label:"הוצאה חדשה", action:()=>setModal("new-expense")},
                 {icon:Icon.chart, label:"סיכום חודשי", action:()=>setModal("monthly")},
-                {icon:Icon.yearly, label:"סיכום שנתי", action:()=>setModal("yearly")},
+                {icon:Icon.yearly, label:"ייצוא דוח", action:()=>setModal("export")},
               ].map((q,i)=>(
                 <button key={i} style={S.quickBtn} onClick={q.action} className="press-scale">
                   <span style={{color:"#1d4ed8"}}>{q.icon}</span>
@@ -566,8 +566,13 @@ export default function App() {
         </Screen>
       </div>
 
-      {/* Bottom Nav - RTL: בית / היסטוריה / כספים / + */}
+      {/* Bottom Nav - RTL: + / בית / היסטוריה / כספים */}
       <nav style={S.bottomNav}>
+        {/* Plus button - far left in RTL */}
+        <button style={S.navPlus} className="press-scale" onClick={()=>{setForm(initialForm);setEditId(null);setModal("new-event");}}>
+          {Icon.plus}
+        </button>
+
         {[
           {v:"home",icon:Icon.home,label:"בית"},
           {v:"history",icon:Icon.history,label:"היסטוריה"},
@@ -578,11 +583,6 @@ export default function App() {
             <span style={{...S.navLabel,color:view===item.v?"#1d4ed8":"#94a3b8"}}>{item.label}</span>
           </button>
         ))}
-
-        {/* Plus button - far left in RTL */}
-        <button style={S.navPlus} className="press-scale" onClick={()=>{setForm(initialForm);setEditId(null);setModal("new-event");}}>
-          {Icon.plus}
-        </button>
       </nav>
 
       {/* ── Modals ── */}
@@ -601,6 +601,34 @@ export default function App() {
           <div style={S.typeGrid}>
             {SHOOT_TYPES.map(t=>(
               <button key={t} style={{...S.typeChip,...(form.type===t?S.typeChipActive:{})}} onClick={()=>setForm({...form,type:t})}>{t}</button>
+            ))}
+          </div>
+        </FormGroup>
+        <FormGroup label="חבילה">
+          <div style={{display:"flex",gap:10}}>
+            {[{val:"חבילה ראשונה",num:"1"},{val:"חבילה שנייה",num:"2"}].map(p=>(
+              <button key={p.val} style={{flex:1,padding:"11px 8px",borderRadius:12,fontSize:14,fontWeight:700,fontFamily:"inherit",cursor:"pointer",transition:"all 0.15s",
+                background:form.package===p.val?"linear-gradient(135deg,#1d4ed8,#3b82f6)":"rgba(248,250,252,0.9)",
+                color:form.package===p.val?"#fff":"#64748b",
+                border:form.package===p.val?"1px solid #1d4ed8":"1px solid rgba(226,232,240,0.8)"}}
+                onClick={()=>{
+                  const isSecond = p.val==="חבילה שנייה";
+                  setForm({...form, package:p.val, drone: isSecond?true:form.drone, vintage: isSecond?true:form.vintage});
+                }}>
+                חבילה {p.num}
+              </button>
+            ))}
+          </div>
+        </FormGroup>
+        <FormGroup label="תוספות">
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            {[{key:"drone",label:"צילום רחפן"},{key:"vintage",label:"צילום וינטג׳ בקלטת"}].map(cb=>(
+              <label key={cb.key} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",userSelect:"none"}}>
+                <div onClick={()=>setForm({...form,[cb.key]:!form[cb.key]})} style={{width:22,height:22,borderRadius:6,border:form[cb.key]?"2px solid #1d4ed8":"2px solid rgba(203,213,225,0.9)",background:form[cb.key]?"#1d4ed8":"rgba(248,250,252,0.9)",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s",flexShrink:0}}>
+                  {form[cb.key]&&<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                </div>
+                <span style={{fontSize:14,fontWeight:600,color:"#334155"}}>{cb.label}</span>
+              </label>
             ))}
           </div>
         </FormGroup>
@@ -628,6 +656,35 @@ export default function App() {
           </div>
         </div>
         <div style={S.summaryShootCount}>{shoots.filter(s=>s.date?.startsWith(curMonth)).length} צילומים החודש</div>
+      </Modal>
+
+      {/* Export Modal */}
+      <Modal open={modal==="export"} onClose={()=>setModal(null)} title="ייצוא דוח">
+        <div style={{marginBottom:16,color:"#64748b",fontSize:14}}>בחר איזה דוח לייצא:</div>
+        <button style={{...S.submitBtn,marginBottom:12,background:"linear-gradient(135deg,#166534,#16a34a)"}} onClick={()=>{
+          const rows = [["תאריך","לקוח","סוג","מיקום","טלפון","סכום","מקדמה","יתרה","סטטוס","הערות"],...shoots.map(s=>[s.date,s.clientName,s.type,s.location,s.phone,s.price,s.deposit,(parseFloat(s.price)||0)-(parseFloat(s.deposit)||0),s.paymentStatus,s.notes])];
+          const csv = rows.map(r=>r.map(c=>'"'+(c||"")+'"').join(",")).join("
+");
+          const blob = new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8;"});
+          const a = document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="צילומים.csv"; a.click();
+          setModal(null);
+        }}>📊 ייצוא לאקסל (CSV)</button>
+        <button style={{...S.submitBtn,background:"linear-gradient(135deg,#1e3a8a,#2563eb)"}} onClick={()=>{
+          const year = new Date().getFullYear();
+          const monthlyData = Array.from({length:12},(_,i)=>{
+            const m = String(i+1).padStart(2,"0");
+            const key = year+"-"+m;
+            const inc = shoots.filter(s=>s.date?.startsWith(key)).reduce((s,r)=>s+(parseFloat(r.price)||0),0);
+            const exp = expenses.filter(e=>e.month===key).reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
+            return [key,inc,exp,inc-exp];
+          });
+          const rows = [["חודש","הכנסות","הוצאות","נטו"],...monthlyData];
+          const csv = rows.map(r=>r.map(c=>'"'+(c||"")+'"').join(",")).join("
+");
+          const blob = new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8;"});
+          const a = document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="דוח-שנתי-"+year+".csv"; a.click();
+          setModal(null);
+        }}>📈 דוח שנתי</button>
       </Modal>
 
       {/* Yearly Summary */}
@@ -661,7 +718,7 @@ function FormGroup({label,children}){
 const S = {
   root:{minHeight:"100vh",background:"linear-gradient(160deg,#dbeafe 0%,#f0f9ff 50%,#eff6ff 100%)",direction:"rtl",fontFamily:"'Heebo',sans-serif",paddingBottom:80,overflowX:"hidden"},
   loginRoot:{minHeight:"100vh",background:"linear-gradient(160deg,#1e3a8a,#1d4ed8)",display:"flex",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"'Heebo',sans-serif",direction:"rtl"},
-  main:{maxWidth:520,margin:"0 auto",padding:"16px 16px 24px",paddingBottom:"calc(100px + env(safe-area-inset-bottom))"},
+  main:{maxWidth:520,margin:"0 auto",padding:"16px 16px calc(120px + env(safe-area-inset-bottom))"},
 
   // Header
   header:{background:"rgba(255,255,255,0.8)",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",borderBottom:"1px solid rgba(219,234,254,0.6)",position:"sticky",top:0,zIndex:40,display:"flex",alignItems:"center",justifyContent:"space-between",height:56,padding:"0 16px"},
@@ -723,6 +780,7 @@ const S = {
   shootBottom:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"},
   shootType:{fontSize:11,padding:"3px 10px",borderRadius:20,background:"rgba(219,234,254,0.7)",color:"#1d4ed8",fontWeight:700},
   shootPhone:{fontSize:11,color:"#94a3b8"},
+  actionBtn:{background:"rgba(248,250,252,0.9)",border:"1px solid rgba(226,232,240,0.6)",color:"#334155",padding:"5px 10px",borderRadius:8,cursor:"pointer",fontSize:14,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",minWidth:32},
   editBtn:{background:"rgba(239,246,255,0.8)",border:"1px solid rgba(191,219,254,0.5)",color:"#1d4ed8",padding:"4px 12px",borderRadius:8,cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:600},
   deleteBtn:{background:"rgba(254,242,242,0.8)",border:"1px solid rgba(254,202,202,0.5)",color:"#ef4444",padding:"4px 12px",borderRadius:8,cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:600},
 
@@ -744,7 +802,7 @@ const S = {
   calDot:{width:4,height:4,borderRadius:"50%",background:"#3b82f6",marginTop:2},
 
   // Form
-  input:{width:"100%",background:"rgba(248,250,252,0.9)",border:"1px solid rgba(226,232,240,0.8)",borderRadius:12,color:"#1e293b",padding:"12px 14px",fontSize:16,fontFamily:"inherit",outline:"none",boxSizing:"border-box"},
+  input:{width:"100%",background:"rgba(248,250,252,0.9)",border:"1px solid rgba(226,232,240,0.8)",borderRadius:12,color:"#1e293b",padding:"13px 14px",fontSize:16,fontFamily:"inherit",outline:"none",boxSizing:"border-box",display:"block"},
   typeGrid:{display:"flex",flexWrap:"wrap",gap:8},
   typeChip:{background:"rgba(248,250,252,0.9)",border:"1px solid rgba(226,232,240,0.8)",borderRadius:20,padding:"7px 14px",fontSize:13,color:"#64748b",cursor:"pointer",fontFamily:"inherit",fontWeight:600,transition:"all 0.15s"},
   typeChipActive:{background:"rgba(239,246,255,0.9)",border:"1px solid #bfdbfe",color:"#1d4ed8"},
