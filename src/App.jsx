@@ -253,11 +253,9 @@ export default function App() {
     setAuthLoading(false);
   }
 
-  async function handleGoogleLogin() {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(window.location.href)}`, {
-      headers: { apikey: SUPABASE_KEY },
-    });
-    window.location.href = res.url || `${SUPABASE_URL}/auth/v1/authorize?provider=google`;
+  function handleGoogleLogin() {
+    const redirectTo = encodeURIComponent("https://tpv-eight.vercel.app");
+    window.location.href = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${redirectTo}`;
   }
 
   // Handle OAuth redirect
