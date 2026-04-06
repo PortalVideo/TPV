@@ -276,7 +276,7 @@ export default function App() {
         <div style={gl.loginSub}>מערכת ניהול ימי צילום</div>
         <div style={gl.authTabs}>
           {["login","register"].map(v=>(
-            <button key={v} onClick={()=>setAuthView(v)} style={{...gl.authTab,..  (authView===v?gl.authTabActive:{})}}>
+            <button key={v} onClick={()=>setAuthView(v)} style={{...gl.authTab,...(authView===v?gl.authTabActive:{})}}>
               {v==="login"?"התחברות":"הרשמה"}
             </button>
           ))}
