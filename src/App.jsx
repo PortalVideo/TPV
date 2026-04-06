@@ -247,7 +247,7 @@ export default function App() {
       const [s,e]=await Promise.all([sbFetch("shoots?order=date.desc",{},authToken),sbFetch("expenses?order=created_at.desc",{},authToken)]);
       setShoots((s||[]).map(r=>({id:r.id,date:r.date,clientName:r.client_name,phone:r.phone||"",type:r.type,location:r.location||"",price:r.price,deposit:r.deposit||0,paymentStatus:r.payment_status||"לא שולם",notes:r.notes||"",calendarEventId:r.calendar_event_id})));
       setExpenses((e||[]).map(r=>({id:r.id,month:r.month,description:r.description,amount:r.amount})));
-    }catch{ showToast("שגיאה בטעינה","error"); }
+    }catch(err){ console.error('load error',err); }
     setLoading(false);
   }
 
@@ -590,10 +590,6 @@ export default function App() {
           </button>
         ))}
 
-        <button style={{...S.navItem,...(settingsOpen?S.navItemActive:{})}} onClick={()=>{setMenuOpen(false);setSettingsOpen(o=>!o);}}>
-          <span style={{color:settingsOpen?"#1d4ed8":"#94a3b8",display:"flex"}}>{Icon.settings}</span>
-          <span style={{...S.navLabel,color:settingsOpen?"#1d4ed8":"#94a3b8"}}>הגדרות</span>
-        </button>
       </nav>
 
       {/* ── Modals ── */}
