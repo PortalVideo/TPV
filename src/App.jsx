@@ -651,7 +651,7 @@ export default function App() {
         </FormGroup>
         <FormGroup label="תוספות">
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
-            {[{key:"drone",label:"צילום רחפן"},{key:"vintage",label:"צילום וינטג׳ בקלטת"}].map(cb=>(
+            {[{key:"drone",label:צילום רחפן},{key:"vintage",label:צילום וינטג בקלטת}].map(cb=>(
               <label key={cb.key} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",userSelect:"none"}}>
                 <div onClick={()=>setForm({...form,[cb.key]:!form[cb.key]})} style={{width:22,height:22,borderRadius:6,border:form[cb.key]?"2px solid #1d4ed8":"2px solid rgba(203,213,225,0.9)",background:form[cb.key]?"#1d4ed8":"rgba(248,250,252,0.9)",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s",flexShrink:0}}>
                   {form[cb.key]&&<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
