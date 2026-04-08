@@ -33,7 +33,7 @@ async function sbAuth(action, body) {
 }
 
 const SHOOT_TYPES = ["חתונות / אירועים", "תוכן לרשתות חברתיות", "פרסומות / קומרשיאל", "קליפים מוזיקליים", "תדמית לעסקים", "אחר"];
-const initialForm = { date: "", clientName: "", location: "", phone: "05", price: "", deposit: "", type: "חתונות / אירועים", notes: "", calendarEventId: null };
+const initialForm = { date: "", clientName: "", location: "", phone: "05", price: "", deposit: "", type: "חתונות / אירועים", notes: "", calendarEventId: null, package: "", drone: false, vintage: false };
 
 function fmt(n) { return Number(n || 0).toLocaleString("he-IL") + " ₪"; }
 function getCurrentMonth() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; }
@@ -682,6 +682,44 @@ export default function App() {
           <div style={S.typeGrid}>
             {SHOOT_TYPES.map(t=>(
               <button key={t} style={{...S.typeChip,...(form.type===t?S.typeChipActive:{})}} onClick={()=>setForm({...form,type:t})}>{t}</button>
+            ))}
+          </div>
+        </FormGroup>
+        <FormGroup label="חבילה">
+          <div style={{display:"flex",gap:10}}>
+            {["חבילה 1","חבילה 2"].map(p=>(
+              <button key={p} onClick={()=>{
+                const isP2 = p==="חבילה 2";
+                setForm({...form, package:form.package===p?"":p, drone:isP2?true:form.drone, vintage:isP2?true:form.vintage});
+              }} style={{
+                flex:1,padding:"11px 0",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",
+                border:form.package===p?"2px solid #1d4ed8":"1px solid rgba(226,232,240,0.8)",
+                background:form.package===p?"rgba(239,246,255,0.95)":"rgba(248,250,252,0.9)",
+                color:form.package===p?"#1d4ed8":"#64748b",
+                transition:"all 0.15s"
+              }}>{p}</button>
+            ))}
+          </div>
+        </FormGroup>
+        <FormGroup label="תוספות">
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {[{key:"drone",label:"צילום רחפן"},{key:"vintage",label:"צילום וינטג׳ בקלטת"}].map(item=>(
+              <button key={item.key} onClick={()=>setForm({...form,[item.key]:!form[item.key]})} style={{
+                display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,
+                background:form[item.key]?"rgba(239,246,255,0.95)":"rgba(248,250,252,0.9)",
+                border:form[item.key]?"1px solid #bfdbfe":"1px solid rgba(226,232,240,0.8)",
+                cursor:"pointer",fontFamily:"inherit",textAlign:"right",width:"100%",transition:"all 0.15s"
+              }}>
+                <div style={{
+                  width:22,height:22,borderRadius:6,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",
+                  background:form[item.key]?"#1d4ed8":"#fff",
+                  border:form[item.key]?"2px solid #1d4ed8":"2px solid #cbd5e1",
+                  transition:"all 0.15s"
+                }}>
+                  {form[item.key]&&<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                </div>
+                <span style={{fontSize:14,fontWeight:600,color:form[item.key]?"#1d4ed8":"#334155"}}>{item.label}</span>
+              </button>
             ))}
           </div>
         </FormGroup>
