@@ -292,36 +292,36 @@ function FabSheet({ open, onClose, onShoot, onPizza, onExpense }) {
 
   if (!mounted) return null;
 
+  // Calculate navbar height for positioning
+  const nbH = "calc(env(safe-area-inset-bottom) + 72px)";
+
   return (
-    <div style={{position:"fixed",inset:0,zIndex:150,pointerEvents:show?"all":"none"}}>
-      {/* Backdrop — only above navbar */}
+    <div style={{position:"fixed",inset:0,zIndex:155,pointerEvents:show?"all":"none"}}>
+      {/* Backdrop — stops at navbar top */}
       <div
         onClick={onClose}
-        style={{position:"absolute",top:0,left:0,right:0,bottom:"calc(env(safe-area-inset-bottom) + 70px)",background:"rgba(15,23,42,0.45)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",opacity:show?1:0,transition:"opacity 0.28s ease"}}
+        style={{position:"absolute",top:0,left:0,right:0,bottom:nbH,background:"rgba(15,23,42,0.45)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",opacity:show?1:0,transition:"opacity 0.28s ease"}}
       />
-      {/* Sheet — seamlessly connected to navbar */}
+      {/* Sheet — sits right on top of navbar, no overlap */}
       <div
-        style={{position:"absolute",bottom:0,left:0,right:0,background:"rgba(255,255,255,0.98)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",borderRadius:"28px 28px 0 0",paddingBottom:"calc(env(safe-area-inset-bottom) + 70px)",boxShadow:"0 -12px 40px rgba(15,23,42,0.15)",transform:show?"translateY(0)":"translateY(100%)",transition:"transform 0.35s cubic-bezier(0.4,0,0.2,1)"}}
+        style={{position:"absolute",bottom:nbH,left:0,right:0,background:"rgba(255,255,255,0.99)",borderRadius:"24px 24px 0 0",padding:"12px 16px 16px",boxShadow:"0 -8px 32px rgba(15,23,42,0.14)",transform:show?"translateY(0)":"translateY(100%)",transition:"transform 0.35s cubic-bezier(0.4,0,0.2,1)"}}
         onClick={e=>e.stopPropagation()}
       >
-        {/* Handle */}
-        <div style={{width:36,height:4,borderRadius:2,background:"#cbd5e1",margin:"12px auto 16px"}}/>
-        <div style={{fontSize:15,fontWeight:800,color:"#0f172a",textAlign:"center",marginBottom:12,letterSpacing:0.2}}>מה תרצה להוסיף?</div>
-        <div style={{padding:"0 16px"}}>
-          {[
-            {emoji:"🎬",label:"יום צילום חדש",sub:"הוסף צילום חדש ללוח",action:onShoot},
-            {emoji:"🍕",label:"אירוע פיצות חדש",sub:"אירוע פיצות וחברים",action:onPizza},
-            {emoji:"💸",label:"הוצאה חדשה",sub:"תיעוד הוצאה עסקית",action:onExpense},
-          ].map((opt,i)=>(
-            <button key={i} className="press-scale" onClick={opt.action} style={{background:"rgba(248,250,252,0.9)",border:"1px solid rgba(219,234,254,0.6)",borderRadius:16,padding:"13px 16px",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:14,width:"100%",marginBottom:i<2?10:0}}>
-              <div style={{width:46,height:46,borderRadius:13,background:"rgba(239,246,255,0.9)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>{opt.emoji}</div>
-              <div style={{textAlign:"right"}}>
-                <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>{opt.label}</div>
-                <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>{opt.sub}</div>
-              </div>
-            </button>
-          ))}
-        </div>
+        <div style={{width:36,height:4,borderRadius:2,background:"#cbd5e1",margin:"0 auto 14px"}}/>
+        <div style={{fontSize:15,fontWeight:800,color:"#0f172a",textAlign:"center",marginBottom:12}}>מה תרצה להוסיף?</div>
+        {[
+          {emoji:"🎬",label:"יום צילום חדש",sub:"הוסף צילום חדש ללוח",action:onShoot},
+          {emoji:"🍕",label:"אירוע פיצות חדש",sub:"אירוע פיצות וחברים",action:onPizza},
+          {emoji:"💸",label:"הוצאה חדשה",sub:"תיעוד הוצאה עסקית",action:onExpense},
+        ].map((opt,i)=>(
+          <button key={i} className="press-scale" onClick={opt.action} style={{background:"rgba(248,250,252,0.9)",border:"1px solid rgba(219,234,254,0.6)",borderRadius:16,padding:"13px 16px",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:14,width:"100%",marginBottom:i<2?10:0}}>
+            <div style={{width:46,height:46,borderRadius:13,background:"rgba(239,246,255,0.9)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>{opt.emoji}</div>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>{opt.label}</div>
+              <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>{opt.sub}</div>
+            </div>
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -1584,7 +1584,7 @@ const S = {
   settingBtnRed:{background:"#fef2f2",color:"#ef4444",border:"1px solid #fecaca",borderRadius:8,padding:"6px 14px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"},
 
   // Bottom nav
-  bottomNav:{position:"fixed",bottom:0,left:0,right:0,background:"rgba(255,255,255,0.97)",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",borderTop:"1px solid rgba(219,234,254,0.6)",display:"flex",alignItems:"center",justifyContent:"space-around",padding:"14px 8px",paddingBottom:"calc(20px + env(safe-area-inset-bottom))",zIndex:40,boxShadow:"0 -4px 20px rgba(15,23,42,0.06)"},
+  bottomNav:{position:"fixed",bottom:0,left:0,right:0,background:"rgba(255,255,255,0.97)",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",borderTop:"1px solid rgba(219,234,254,0.6)",display:"flex",alignItems:"center",justifyContent:"space-around",padding:"14px 8px",paddingBottom:"calc(20px + env(safe-area-inset-bottom))",zIndex:160,boxShadow:"0 -4px 20px rgba(15,23,42,0.06)"},
   navItem:{flex:1,background:"transparent",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"4px 0",fontFamily:"inherit",transition:"all 0.15s ease"},
   navItemActive:{},
   navLabel:{fontSize:10,fontWeight:600},
