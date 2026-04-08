@@ -1225,26 +1225,26 @@ export default function App() {
         ))}
 
         {/* FAB */}
-        {fabOpen&&<div style={{position:"fixed",inset:0,zIndex:39,background:"rgba(15,23,42,0.35)",backdropFilter:"blur(4px)"}} onClick={()=>setFabOpen(false)}/>}
-        <div style={{position:"relative"}}>
-          {fabOpen&&(
-            <div style={{position:"absolute",bottom:"calc(100% + 16px)",left:"50%",transform:"translateX(-50%)",display:"flex",flexDirection:"column",gap:10,alignItems:"stretch",zIndex:50,minWidth:200}}>
+        {fabOpen&&(
+          <>
+            <div style={{position:"fixed",inset:0,zIndex:39,background:"rgba(15,23,42,0.35)",backdropFilter:"blur(4px)"}} onClick={()=>setFabOpen(false)}/>
+            <div style={{position:"fixed",bottom:"calc(env(safe-area-inset-bottom) + 90px)",left:16,right:16,zIndex:50,display:"flex",flexDirection:"column",gap:10}}>
               {[
                 {emoji:"🎬",label:"יום צילום חדש",action:()=>{setForm(initialForm);setEditId(null);setEventType("shoot");setModal("new-event");}},
                 {emoji:"🍕",label:"אירוע פיצות חדש",action:()=>{setForm(initialForm);setEditId(null);setEventType("pizza");setModal("new-event");}},
                 {emoji:"💸",label:"הוצאה חדשה",action:()=>setModal("new-expense")},
               ].map((opt,i)=>(
-                <button key={i} className="press-scale" onClick={()=>{setFabOpen(false);opt.action();}} style={{background:"rgba(255,255,255,0.97)",border:"1px solid rgba(219,234,254,0.9)",borderRadius:16,padding:"13px 18px",fontSize:15,fontWeight:700,color:"#0f172a",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:12,boxShadow:"0 4px 20px rgba(15,23,42,0.13)",whiteSpace:"nowrap"}}>
-                  <span style={{fontSize:22}}>{opt.emoji}</span>
+                <button key={i} className="press-scale" onClick={()=>{setFabOpen(false);opt.action();}} style={{background:"rgba(255,255,255,0.97)",border:"1px solid rgba(219,234,254,0.7)",borderRadius:16,padding:"14px 20px",fontSize:16,fontWeight:700,color:"#0f172a",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:14,boxShadow:"0 4px 24px rgba(15,23,42,0.15)"}}>
+                  <span style={{fontSize:24}}>{opt.emoji}</span>
                   <span>{opt.label}</span>
                 </button>
               ))}
             </div>
-          )}
-          <button style={{...S.navPlus,transform:fabOpen?"rotate(45deg)":"none",transition:"transform 0.2s ease"}} className="press-scale" onClick={()=>setFabOpen(o=>!o)}>
-            {Icon.plus}
-          </button>
-        </div>
+          </>
+        )}
+        <button style={{...S.navPlus,transform:fabOpen?"rotate(45deg)":"none",transition:"transform 0.2s ease"}} className="press-scale" onClick={()=>setFabOpen(o=>!o)}>
+          {Icon.plus}
+        </button>
       </nav>
 
       {/* ── Modals ── */}
