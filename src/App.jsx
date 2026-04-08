@@ -1224,21 +1224,28 @@ export default function App() {
           </button>
         ))}
 
-        {/* FAB */}
+        {/* FAB Sheet */}
         {fabOpen&&(
           <>
-            <div style={{position:"fixed",inset:0,zIndex:39,background:"rgba(15,23,42,0.35)",backdropFilter:"blur(4px)"}} onClick={()=>setFabOpen(false)}/>
-            <div style={{position:"fixed",bottom:"calc(env(safe-area-inset-bottom) + 90px)",left:16,right:16,zIndex:50,display:"flex",flexDirection:"column",gap:10}}>
-              {[
-                {emoji:"🎬",label:"יום צילום חדש",action:()=>{setForm(initialForm);setEditId(null);setEventType("shoot");setModal("new-event");}},
-                {emoji:"🍕",label:"אירוע פיצות חדש",action:()=>{setForm(initialForm);setEditId(null);setEventType("pizza");setModal("new-event");}},
-                {emoji:"💸",label:"הוצאה חדשה",action:()=>setModal("new-expense")},
-              ].map((opt,i)=>(
-                <button key={i} className="press-scale" onClick={()=>{setFabOpen(false);opt.action();}} style={{background:"rgba(255,255,255,0.97)",border:"1px solid rgba(219,234,254,0.7)",borderRadius:16,padding:"14px 20px",fontSize:16,fontWeight:700,color:"#0f172a",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:14,boxShadow:"0 4px 24px rgba(15,23,42,0.15)"}}>
-                  <span style={{fontSize:24}}>{opt.emoji}</span>
-                  <span>{opt.label}</span>
-                </button>
-              ))}
+            <div style={{position:"fixed",inset:0,zIndex:39,background:"rgba(15,23,42,0.4)",backdropFilter:"blur(6px)"}} onClick={()=>setFabOpen(false)}/>
+            <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:50,background:"rgba(255,255,255,0.97)",borderRadius:"24px 24px 0 0",padding:"20px 16px calc(24px + env(safe-area-inset-bottom))",boxShadow:"0 -8px 40px rgba(15,23,42,0.15)"}}>
+              <div style={{width:40,height:4,borderRadius:2,background:"rgba(203,213,225,0.8)",margin:"0 auto 20px"}}/>
+              <div style={{fontSize:16,fontWeight:800,color:"#0f172a",textAlign:"center",marginBottom:16}}>מה תרצה להוסיף?</div>
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                {[
+                  {emoji:"🎬",label:"יום צילום חדש",sub:"הוסף צילום חדש ללוח",action:()=>{setForm(initialForm);setEditId(null);setEventType("shoot");setModal("new-event");}},
+                  {emoji:"🍕",label:"אירוע פיצות חדש",sub:"ארוע פיצות וחברים",action:()=>{setForm(initialForm);setEditId(null);setEventType("pizza");setModal("new-event");}},
+                  {emoji:"💸",label:"הוצאה חדשה",sub:"תיעוד הוצאה עסקית",action:()=>setModal("new-expense")},
+                ].map((opt,i)=>(
+                  <button key={i} className="press-scale" onClick={()=>{setFabOpen(false);opt.action();}} style={{background:"rgba(248,250,252,0.9)",border:"1px solid rgba(219,234,254,0.7)",borderRadius:16,padding:"14px 16px",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:14,textAlign:"right",width:"100%"}}>
+                    <div style={{width:48,height:48,borderRadius:14,background:"rgba(239,246,255,0.9)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>{opt.emoji}</div>
+                    <div>
+                      <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>{opt.label}</div>
+                      <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>{opt.sub}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           </>
         )}
