@@ -734,7 +734,7 @@ export default function App() {
   async function loadData(){
     setLoading(true);
     try{
-      const [s,e]=await Promise.all([sbFetch("shoots?order=date.desc",{},authToken),sbFetch("expenses?order=created_at.desc",{},authToken)]);
+      const [s,e]=await Promise.all([sbFetch("shoots?order=date.desc&user_id=eq."+user?.id,{},authToken),sbFetch("expenses?order=created_at.desc&user_id=eq."+user?.id,{},authToken)]);
       setShoots((s||[]).map(r=>({id:r.id,date:r.date,clientName:r.client_name,phone:r.phone||"",type:r.type,location:r.location||"",price:r.price,deposit:r.deposit||0,paymentStatus:r.payment_status||"לא שולם",notes:r.notes||"",calendarEventId:r.calendar_event_id,package:r.package||"",drone:r.drone||false,vintage:r.vintage||false,depositPaid:r.deposit_paid||false,fullPaid:r.full_paid||false,productionStatus:r.production_status||"",remind90:r.remind90||false})));
       setExpenses((e||[]).map(r=>({id:r.id,month:r.month,description:r.description,amount:r.amount})));
     }catch(err){ console.error('load error',err); }
@@ -797,7 +797,7 @@ export default function App() {
     } else {
       let calId=gcalToken?await gcalCreate(form):null;
       try{
-        const res=await sbFetch("shoots",{method:"POST",body:JSON.stringify({date:form.date,client_name:form.clientName,phone:form.phone,type:form.type,location:form.location,price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,payment_status:"לא שולם",notes:form.notes,calendar_event_id:calId,package:form.package,drone:form.drone,vintage:form.vintage,deposit_paid:form.depositPaid||false,full_paid:form.fullPaid||false,production_status:"",remind90:form.remind90||false})},authToken);
+        const res=await sbFetch("shoots",{method:"POST",body:JSON.stringify({date:form.date,client_name:form.clientName,phone:form.phone,type:form.type,location:form.location,price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,payment_status:"לא שולם",notes:form.notes,calendar_event_id:calId,package:form.package,drone:form.drone,vintage:form.vintage,deposit_paid:form.depositPaid||false,full_paid:form.fullPaid||false,production_status:"",remind90:form.remind90||false,user_id:user?.id})},authToken);
         const newId=res?.[0]?.id??null;
         const newShoot={id:newId,date:form.date,clientName:form.clientName,phone:form.phone||"",type:form.type,location:form.location||"",price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,paymentStatus:"לא שולם",notes:form.notes||"",calendarEventId:calId,package:form.package||"",drone:form.drone||false,vintage:form.vintage||false,depositPaid:form.depositPaid||false,fullPaid:form.fullPaid||false,productionStatus:"",remind90:form.remind90||false};
         setShoots([newShoot,...shoots]);
@@ -830,7 +830,7 @@ export default function App() {
   async function handleAddExpense(){
     if(!expForm.amount||!expForm.description){ showToast("נא למלא סכום ותיאור","error"); return; }
     try{
-      const res=await sbFetch("expenses",{method:"POST",body:JSON.stringify({month:expForm.month,description:expForm.description,amount:parseFloat(expForm.amount)||0})},authToken);
+      const res=await sbFetch("expenses",{method:"POST",body:JSON.stringify({month:expForm.month,description:expForm.description,amount:parseFloat(expForm.amount)||0,user_id:user?.id})},authToken);
       setExpenses([{id:res[0].id,...expForm},...expenses]);
       setExpForm({month:getCurrentMonth(),amount:"",description:""});
       showToast("הוצאה נוספה ✓"); setModal(null);
@@ -1307,7 +1307,7 @@ export default function App() {
             <button style={{...S.submitBtn,background:"linear-gradient(135deg,#ea580c,#f97316)"}} onClick={async()=>{
               if(!pizzaForm.date||!pizzaForm.clientName||!pizzaForm.price){showToast("נא למלא תאריך, שם לקוח וסכום","error");return;}
               try{
-                const res=await sbFetch("shoots",{method:"POST",body:JSON.stringify({date:pizzaForm.date,client_name:pizzaForm.clientName,phone:pizzaForm.phone,type:"פיצות 🍕",location:"",price:parseFloat(pizzaForm.price)||0,deposit:parseFloat(pizzaForm.deposit)||0,payment_status:"לא שולם",notes:pizzaForm.notes,calendar_event_id:null,package:"",drone:false,vintage:false,deposit_paid:pizzaForm.depositPaid,full_paid:pizzaForm.fullPaid,production_status:"",remind90:pizzaForm.remind90})},authToken);
+                const res=await sbFetch("shoots",{method:"POST",body:JSON.stringify({date:pizzaForm.date,client_name:pizzaForm.clientName,phone:pizzaForm.phone,type:"פיצות 🍕",location:"",price:parseFloat(pizzaForm.price)||0,deposit:parseFloat(pizzaForm.deposit)||0,payment_status:"לא שולם",notes:pizzaForm.notes,calendar_event_id:null,package:"",drone:false,vintage:false,deposit_paid:pizzaForm.depositPaid,full_paid:pizzaForm.fullPaid,production_status:"",remind90:pizzaForm.remind90,user_id:user?.id})},authToken);
                 setShoots([{id:res[0].id,date:pizzaForm.date,clientName:pizzaForm.clientName,phone:pizzaForm.phone,type:"פיצות 🍕",location:"",price:pizzaForm.price,deposit:pizzaForm.deposit,paymentStatus:"לא שולם",notes:pizzaForm.notes,calendarEventId:null,package:"",drone:false,vintage:false,depositPaid:pizzaForm.depositPaid,fullPaid:pizzaForm.fullPaid,productionStatus:"",remind90:pizzaForm.remind90},...shoots]);
                 showToast("אירוע פיצות נשמר ✓");
                 setPizzaForm({date:"",clientName:"",phone:"05",price:"",deposit:"",depositPaid:false,fullPaid:false,remind90:false,notes:""});
