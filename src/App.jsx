@@ -751,21 +751,12 @@ export default function App() {
       const rt=params.get("refresh_token");
       if(at){ fetch(`${SUPABASE_URL}/auth/v1/user`,{headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${at}`}}).then(r=>r.json()).then(u=>{ setUser(u); setAuthToken(at); localStorage.setItem("tpv_session",JSON.stringify({user:u,access_token:at,refresh_token:rt})); window.history.replaceState({},"",window.location.pathname); }); return; }
     }
-    // Restore session and auto-refresh
+    // Pre-fill email from last session (but always require password)
     const saved=localStorage.getItem("tpv_session");
     if(saved){
       try{
-        const {user,access_token,refresh_token}=JSON.parse(saved);
-        // Try to refresh token
-        if(refresh_token){
-          fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`,{method:"POST",headers:{apikey:SUPABASE_KEY,"Content-Type":"application/json"},body:JSON.stringify({refresh_token})})
-            .then(r=>r.json()).then(d=>{
-              if(d.access_token){
-                setUser(d.user||user); setAuthToken(d.access_token);
-                localStorage.setItem("tpv_session",JSON.stringify({user:d.user||user,access_token:d.access_token,refresh_token:d.refresh_token||refresh_token}));
-              } else { setUser(user); setAuthToken(access_token); }
-            }).catch(()=>{ setUser(user); setAuthToken(access_token); });
-        } else { setUser(user); setAuthToken(access_token); }
+        const {user}=JSON.parse(saved);
+        if(user?.email) setAuthForm(f=>({...f,email:user.email}));
       }catch{}
     }
   },[]);
@@ -801,7 +792,7 @@ export default function App() {
 
   async function handleLogin(){
     setAuthLoading(true);
-    try{ const d=await sbAuth("token?grant_type=password",{email:authForm.email,password:authForm.password}); setUser(d.user); setAuthToken(d.access_token); localStorage.setItem("tpv_session",JSON.stringify({user:d.user,access_token:d.access_token})); }
+    try{ const d=await sbAuth("token?grant_type=password",{email:authForm.email,password:authForm.password}); setUser(d.user); setAuthToken(d.access_token); localStorage.setItem("tpv_session",JSON.stringify({user:d.user})); }
     catch(e){ showToast(e.message,"error"); }
     setAuthLoading(false);
   }
