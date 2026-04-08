@@ -1224,35 +1224,36 @@ export default function App() {
           </button>
         ))}
 
-        {/* FAB Sheet */}
-        {fabOpen&&(
-          <>
-            <div style={{position:"fixed",inset:0,zIndex:39,background:"rgba(15,23,42,0.4)",backdropFilter:"blur(6px)"}} onClick={()=>setFabOpen(false)}/>
-            <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:50,background:"rgba(255,255,255,0.97)",borderRadius:"24px 24px 0 0",padding:"20px 16px calc(24px + env(safe-area-inset-bottom))",boxShadow:"0 -8px 40px rgba(15,23,42,0.15)"}}>
-              <div style={{width:40,height:4,borderRadius:2,background:"rgba(203,213,225,0.8)",margin:"0 auto 20px"}}/>
-              <div style={{fontSize:16,fontWeight:800,color:"#0f172a",textAlign:"center",marginBottom:16}}>מה תרצה להוסיף?</div>
-              <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                {[
-                  {emoji:"🎬",label:"יום צילום חדש",sub:"הוסף צילום חדש ללוח",action:()=>{setForm(initialForm);setEditId(null);setEventType("shoot");setModal("new-event");}},
-                  {emoji:"🍕",label:"אירוע פיצות חדש",sub:"ארוע פיצות וחברים",action:()=>{setForm(initialForm);setEditId(null);setEventType("pizza");setModal("new-event");}},
-                  {emoji:"💸",label:"הוצאה חדשה",sub:"תיעוד הוצאה עסקית",action:()=>setModal("new-expense")},
-                ].map((opt,i)=>(
-                  <button key={i} className="press-scale" onClick={()=>{setFabOpen(false);opt.action();}} style={{background:"rgba(248,250,252,0.9)",border:"1px solid rgba(219,234,254,0.7)",borderRadius:16,padding:"14px 16px",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:14,textAlign:"right",width:"100%"}}>
-                    <div style={{width:48,height:48,borderRadius:14,background:"rgba(239,246,255,0.9)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>{opt.emoji}</div>
-                    <div>
-                      <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>{opt.label}</div>
-                      <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>{opt.sub}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
         <button style={{...S.navPlus,transform:fabOpen?"rotate(45deg)":"none",transition:"transform 0.2s ease"}} className="press-scale" onClick={()=>setFabOpen(o=>!o)}>
           {Icon.plus}
         </button>
       </nav>
+
+      {/* FAB Sheet — rendered outside nav so overlay works */}
+      {fabOpen&&(
+        <div style={{position:"fixed",inset:0,zIndex:200}} onClick={()=>setFabOpen(false)}>
+          {/* Backdrop */}
+          <div style={{position:"absolute",inset:0,background:"rgba(15,23,42,0.45)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}/>
+          {/* Sheet */}
+          <div style={{position:"absolute",bottom:0,left:0,right:0,background:"#fff",borderRadius:"24px 24px 0 0",padding:"12px 16px calc(28px + env(safe-area-inset-bottom))",boxShadow:"0 -8px 40px rgba(15,23,42,0.2)"}} onClick={e=>e.stopPropagation()}>
+            <div style={{width:40,height:4,borderRadius:2,background:"#e2e8f0",margin:"0 auto 18px"}}/>
+            <div style={{fontSize:16,fontWeight:800,color:"#0f172a",textAlign:"center",marginBottom:14}}>מה תרצה להוסיף?</div>
+            {[
+              {emoji:"🎬",label:"יום צילום חדש",sub:"הוסף צילום חדש ללוח",action:()=>{setForm(initialForm);setEditId(null);setEventType("shoot");setModal("new-event");}},
+              {emoji:"🍕",label:"אירוע פיצות חדש",sub:"אירוע פיצות וחברים",action:()=>{setForm(initialForm);setEditId(null);setEventType("pizza");setModal("new-event");}},
+              {emoji:"💸",label:"הוצאה חדשה",sub:"תיעוד הוצאה עסקית",action:()=>setModal("new-expense")},
+            ].map((opt,i)=>(
+              <button key={i} className="press-scale" onClick={()=>{setFabOpen(false);opt.action();}} style={{background:"rgba(248,250,252,0.9)",border:"1px solid rgba(219,234,254,0.7)",borderRadius:16,padding:"13px 16px",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:14,width:"100%",marginBottom:10}}>
+                <div style={{width:46,height:46,borderRadius:13,background:"rgba(239,246,255,0.9)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>{opt.emoji}</div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>{opt.label}</div>
+                  <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>{opt.sub}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Modals ── */}
 
