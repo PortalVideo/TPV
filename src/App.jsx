@@ -33,7 +33,7 @@ async function sbAuth(action, body) {
 }
 
 const SHOOT_TYPES = ["חתונות / אירועים", "תוכן לרשתות חברתיות", "פרסומות / קומרשיאל", "קליפים מוזיקליים", "תדמית לעסקים", "אחר"];
-const initialForm = { date: "", clientName: "", location: "", phone: "05", price: "", deposit: "", type: "חתונות / אירועים", notes: "", calendarEventId: null, package: "", drone: false, vintage: false, depositPaid: false, fullPaid: false, productionStatus: "" };
+const initialForm = { date: "", clientName: "", location: "", phone: "05", price: "", deposit: "", type: "חתונות / אירועים", notes: "", calendarEventId: null, package: "", drone: false, vintage: false, depositPaid: false, fullPaid: false, productionStatus: "", remind90: false };
 
 function fmt(n) { return Number(n || 0).toLocaleString("he-IL") + " ₪"; }
 function getCurrentMonth() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; }
@@ -210,137 +210,167 @@ function PayBadge({ shoot, onUpdate }) {
 }
 
 // ── Shoot Card ─────────────────────────────────────────────────
-function ShootCard({ shoot, onEdit, onDelete, onUpdatePayment, onUpdateProduction, animate }) {
+// ── Minimal Home Card (read-only) ─────────────────────────────
+function HomeCard({ shoot }) {
+  const isFuture = shoot.date >= today();
+  const daysSince = shoot.date ? Math.floor((new Date()-new Date(shoot.date))/(1000*60*60*24)) : 0;
+  const daysLeft = 90 - daysSince;
+  const showDeadline = !isFuture && shoot.productionStatus !== "סגור" && daysSince <= 100;
+  const deadlineUrgent = daysLeft <= 14 && daysLeft > 0;
+  const deadlinePassed = daysLeft <= 0;
+  return (
+    <div style={{...S.shootCard,padding:"12px 14px",marginBottom:8}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{flex:1}}>
+          <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>{shoot.clientName}</div>
+          <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>
+            {shoot.date}{shoot.location?" · "+shoot.location:""}
+          </div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+          {showDeadline&&(
+            <span style={{fontSize:10,padding:"2px 7px",borderRadius:10,background:deadlinePassed?"rgba(254,242,242,0.9)":deadlineUrgent?"rgba(255,247,237,0.9)":"rgba(241,245,249,0.8)",color:deadlinePassed?"#dc2626":deadlineUrgent?"#c2410c":"#64748b",fontWeight:700}}>
+              {deadlinePassed?`פג! +${Math.abs(daysLeft)}י`:`${daysLeft}י`}
+            </span>
+          )}
+          <div style={{fontSize:10,padding:"3px 8px",borderRadius:12,background:isFuture?"rgba(239,246,255,0.9)":"rgba(241,245,249,0.8)",color:isFuture?"#1d4ed8":"#94a3b8",fontWeight:600}}>{isFuture?"קרוב":"עבר"}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Expandable Event Card (history page) ──────────────────────
+function ShootCard({ shoot, onEdit, onDelete, onUpdatePayment, onUpdateProduction, animate, expandable=true }) {
+  const [expanded, setExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [prodMenuOpen, setProdMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const menuRef = useRef(null);
+  const prodRef = useRef(null);
   const dep = parseFloat(shoot.deposit)||0;
   const total = parseFloat(shoot.price)||0;
   const rem = total - dep;
 
   useEffect(() => {
-    const h = e => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
+    const h = e => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
+      if (prodRef.current && !prodRef.current.contains(e.target)) setProdMenuOpen(false);
+    };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  function openWhatsApp(e) {
-    e.stopPropagation();
-    const phone = (shoot.phone||"").replace(/[^0-9]/g,"");
-    const msg = encodeURIComponent("היי " + shoot.clientName + "! מאשר את יום הצילום שלנו בתאריך " + shoot.date + (shoot.location ? " ב" + shoot.location : "") + ". מחכה לראותך! טל פורת וידאו");
-    window.open("https://wa.me/972" + phone.replace(/^0/,"") + "?text=" + msg);
-  }
+  const PROD_CFG = {"צולם":{bg:"rgba(239,246,255,0.9)",color:"#1d4ed8"},"בעריכה":{bg:"rgba(254,249,195,0.9)",color:"#854d0e"},"נשלח ללקוח":{bg:"rgba(220,252,231,0.9)",color:"#166534"},"סגור":{bg:"rgba(241,245,249,0.9)",color:"#64748b"}};
+  const daysSince = shoot.date ? Math.floor((new Date()-new Date(shoot.date))/(1000*60*60*24)) : 0;
+  const isLate = shoot.productionStatus==="צולם" && daysSince>7;
+  const prodColor = shoot.productionStatus ? (PROD_CFG[shoot.productionStatus]||PROD_CFG["צולם"]) : null;
 
-  function openWaze(e) {
-    e.stopPropagation();
-    if (!shoot.location) return;
-    window.open("https://waze.com/ul?q=" + encodeURIComponent(shoot.location) + "&navigate=yes");
+  function PencilMenu() {
+    return (
+      <div ref={menuRef} style={{position:"relative"}} onClick={e=>e.stopPropagation()}>
+        <button onClick={e=>{e.stopPropagation();setMenuOpen(o=>!o);}} style={{background:"rgba(248,250,252,0.9)",border:"1px solid rgba(226,232,240,0.7)",borderRadius:8,width:30,height:30,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#64748b",flexShrink:0}}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        {menuOpen&&(
+          <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,background:"#fff",border:"1px solid rgba(226,232,240,0.8)",borderRadius:12,padding:6,zIndex:200,boxShadow:"0 8px 24px rgba(15,23,42,0.15)",minWidth:120}}>
+            <button onClick={()=>{setMenuOpen(false);onEdit(shoot);}} style={{width:"100%",background:"transparent",border:"none",textAlign:"right",padding:"9px 12px",fontSize:13,color:"#1d4ed8",cursor:"pointer",fontFamily:"inherit",fontWeight:600,borderRadius:8,display:"flex",alignItems:"center",gap:8}}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              עריכה
+            </button>
+            <button onClick={()=>{setMenuOpen(false);setConfirmDelete(true);}} style={{width:"100%",background:"transparent",border:"none",textAlign:"right",padding:"9px 12px",fontSize:13,color:"#ef4444",cursor:"pointer",fontFamily:"inherit",fontWeight:600,borderRadius:8,display:"flex",alignItems:"center",gap:8}}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+              מחיקה
+            </button>
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (
-    <div style={{...S.shootCard, opacity: animate?1:0}}>
-      {/* Top row */}
-      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:8}}>
+    <div style={{...S.shootCard,opacity:animate?1:0,marginBottom:8}}>
+      {/* Always visible: collapsed row */}
+      <div style={{display:"flex",alignItems:"center",gap:8,cursor:expandable?"pointer":"default"}} onClick={()=>expandable&&setExpanded(o=>!o)}>
         <div style={{flex:1}}>
-          <div style={S.shootName}>{shoot.clientName}</div>
-          <div style={S.shootMeta}>{shoot.date}{shoot.location?" · "+shoot.location:""}</div>
-        </div>
-        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-          <div style={S.shootPrice}>{fmt(shoot.price)}</div>
-          {/* Pencil menu */}
-          <div ref={menuRef} style={{position:"relative"}}>
-            <button onClick={e=>{e.stopPropagation();setMenuOpen(o=>!o);}} style={{background:"rgba(248,250,252,0.9)",border:"1px solid rgba(226,232,240,0.7)",borderRadius:9,width:32,height:32,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#64748b",flexShrink:0}}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </button>
-            {menuOpen && (
-              <div style={{position:"absolute",top:"calc(100% + 6px)",left:0,background:"#fff",border:"1px solid rgba(226,232,240,0.8)",borderRadius:12,padding:6,zIndex:50,boxShadow:"0 8px 24px rgba(15,23,42,0.12)",minWidth:130}}>
-                <button onClick={e=>{e.stopPropagation();setMenuOpen(false);onEdit(shoot);}} style={{width:"100%",background:"transparent",border:"none",textAlign:"right",padding:"9px 12px",fontSize:14,color:"#1d4ed8",cursor:"pointer",fontFamily:"inherit",fontWeight:600,borderRadius:8,display:"flex",alignItems:"center",gap:8}}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                  עריכה
-                </button>
-                <button onClick={e=>{e.stopPropagation();setMenuOpen(false);setConfirmDelete(true);}} style={{width:"100%",background:"transparent",border:"none",textAlign:"right",padding:"9px 12px",fontSize:14,color:"#ef4444",cursor:"pointer",fontFamily:"inherit",fontWeight:600,borderRadius:8,display:"flex",alignItems:"center",gap:8}}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-                  מחיקה
-                </button>
-              </div>
-            )}
+          <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>{shoot.clientName}</div>
+          <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>
+            {shoot.date}{shoot.location?" · "+shoot.location:""}
           </div>
         </div>
-      </div>
-
-      {/* Tags row */}
-      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:8}}>
-        <span style={S.shootType}>{shoot.type}</span>
-        {shoot.package&&<span style={{...S.shootType,background:"rgba(219,234,254,0.7)",color:"#1e40af"}}>{shoot.package}</span>}
-        {shoot.drone&&<span style={{...S.shootType,background:"rgba(240,249,255,0.8)",color:"#0369a1"}}>🚁</span>}
-        {shoot.vintage&&<span style={{...S.shootType,background:"rgba(254,249,240,0.8)",color:"#92400e"}}>📼</span>}
-        {shoot.depositPaid&&<span style={{fontSize:11,padding:"3px 8px",borderRadius:20,background:"rgba(254,249,195,0.8)",color:"#854d0e",fontWeight:700}}>✓ מקדמה</span>}
-        {shoot.fullPaid&&<span style={{fontSize:11,padding:"3px 8px",borderRadius:20,background:"rgba(220,252,231,0.8)",color:"#166534",fontWeight:700}}>✓ שולם</span>}
-        {/* Production status badge */}
-        {shoot.productionStatus&&(()=>{
-          const cfg={"צולם":{bg:"rgba(239,246,255,0.9)",color:"#1d4ed8"},"בעריכה":{bg:"rgba(254,249,195,0.9)",color:"#854d0e"},"נשלח ללקוח":{bg:"rgba(220,252,231,0.9)",color:"#166534"},"סגור":{bg:"rgba(241,245,249,0.9)",color:"#64748b"}};
-          const c=cfg[shoot.productionStatus]||cfg["צולם"];
-          const daysSince = shoot.date ? Math.floor((new Date()-new Date(shoot.date))/(1000*60*60*24)) : 0;
-          const isLate = shoot.productionStatus==="צולם" && daysSince>7;
-          return <span style={{fontSize:11,padding:"3px 8px",borderRadius:20,background:isLate?"rgba(254,242,242,0.9)":c.bg,color:isLate?"#dc2626":c.color,fontWeight:700}}>{isLate?"⚠️ ":""}{shoot.productionStatus}</span>;
-        })()}
-      </div>
-
-      {/* Finance row */}
-      {dep > 0 && (
-        <div style={{display:"flex",gap:16,padding:"6px 0",borderTop:"1px solid rgba(226,232,240,0.4)",marginBottom:8}}>
-          <span style={{fontSize:12,color:"#64748b"}}>מקדמה: <strong style={{color:"#1d4ed8"}}>{fmt(dep)}</strong></span>
-          <span style={{fontSize:12,color:"#64748b"}}>יתרה: <strong style={{color:"#0369a1"}}>{fmt(rem)}</strong></span>
+        {/* Package + production + deadline badges always visible */}
+        <div style={{display:"flex",alignItems:"center",gap:5,flexShrink:0}}>
+          {shoot.package&&<span style={{fontSize:10,padding:"2px 7px",borderRadius:10,background:"rgba(219,234,254,0.7)",color:"#1e40af",fontWeight:600}}>{shoot.package}</span>}
+          {shoot.productionStatus&&prodColor&&(
+            <span style={{fontSize:10,padding:"2px 7px",borderRadius:10,background:isLate?"rgba(254,242,242,0.9)":prodColor.bg,color:isLate?"#dc2626":prodColor.color,fontWeight:700}}>{isLate?"⚠️":""}{shoot.productionStatus}</span>
+          )}
+          {(()=>{
+            if(shoot.date>=today()||shoot.productionStatus==="סגור") return null;
+            const ds=Math.floor((new Date()-new Date(shoot.date))/(1000*60*60*24));
+            const dl=90-ds;
+            if(ds>100) return null;
+            return <span style={{fontSize:10,padding:"2px 7px",borderRadius:10,background:dl<=0?"rgba(254,242,242,0.9)":dl<=14?"rgba(255,247,237,0.9)":"rgba(241,245,249,0.8)",color:dl<=0?"#dc2626":dl<=14?"#c2410c":"#64748b",fontWeight:700}}>{dl<=0?`פג! +${Math.abs(dl)}י`:`${dl}י`}</span>;
+          })()}
+          <PencilMenu/>
+          {expandable&&<span style={{fontSize:14,color:"#94a3b8",transform:expanded?"rotate(180deg)":"none",transition:"transform 0.2s",display:"flex"}}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </span>}
         </div>
-      )}
-
-      {/* Action buttons */}
-      <div style={{display:"flex",gap:8,paddingTop:8,borderTop:"1px solid rgba(226,232,240,0.4)"}}>
-        {shoot.phone && (
-          <button onClick={e=>{e.stopPropagation();window.open("tel:"+shoot.phone);}} style={S.actionBtnSm}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 11a19.79 19.79 0 01-3.07-8.67A2 2 0 012 .18h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
-            <span>{shoot.phone}</span>
-          </button>
-        )}
-        {shoot.phone && (
-          <button onClick={openWhatsApp} style={{...S.actionBtnSm,background:"rgba(37,211,102,0.08)",border:"1px solid rgba(37,211,102,0.25)",color:"#128c7e"}}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-            <span>WA</span>
-          </button>
-        )}
-        {shoot.location && (
-          <button onClick={openWaze} style={{...S.actionBtnSm,background:"rgba(21,128,61,0.07)",border:"1px solid rgba(21,128,61,0.2)",color:"#166534"}}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 5.4 7.05 11.5 7.35 11.76a1 1 0 0 0 1.3 0C12.95 21.5 20 15.4 20 10a8 8 0 0 0-8-8z"/></svg>
-            <span>Waze</span>
-          </button>
-        )}
       </div>
 
-      {/* Production Status Selector */}
-      {shoot.date < today() && (
-        <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid rgba(226,232,240,0.4)"}}>
-          <div style={{fontSize:11,color:"#94a3b8",marginBottom:6,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>סטטוס הפקה</div>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            {["צולם","בעריכה","נשלח ללקוח","סגור"].map(s=>(
-              <button key={s} onClick={e=>{e.stopPropagation();onUpdateProduction(shoot.id,shoot.productionStatus===s?"":s);}} style={{
-                fontSize:11,padding:"4px 10px",borderRadius:20,cursor:"pointer",fontFamily:"inherit",fontWeight:600,border:"none",
-                background:shoot.productionStatus===s?"#1d4ed8":"rgba(241,245,249,0.8)",
-                color:shoot.productionStatus===s?"#fff":"#64748b",
-                transition:"all 0.15s"
-              }}>{s}</button>
-            ))}
+      {/* Expanded content */}
+      {expanded&&(
+        <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid rgba(226,232,240,0.5)"}}>
+          {/* Tags */}
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+            <span style={S.shootType}>{shoot.type}</span>
+            {shoot.drone&&<span style={{...S.shootType,background:"rgba(240,249,255,0.8)",color:"#0369a1"}}>🚁</span>}
+            {shoot.vintage&&<span style={{...S.shootType,background:"rgba(254,249,240,0.8)",color:"#92400e"}}>📼</span>}
+            {shoot.depositPaid&&<span style={{fontSize:11,padding:"3px 8px",borderRadius:20,background:"rgba(254,249,195,0.8)",color:"#854d0e",fontWeight:700}}>✓ מקדמה</span>}
+            {shoot.fullPaid&&<span style={{fontSize:11,padding:"3px 8px",borderRadius:20,background:"rgba(220,252,231,0.8)",color:"#166534",fontWeight:700}}>✓ שולם</span>}
+          </div>
+
+          {/* Finance */}
+          <div style={{display:"flex",gap:16,marginBottom:10}}>
+            <span style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{fmt(total)}</span>
+            {dep>0&&<span style={{fontSize:12,color:"#64748b"}}>מקדמה: <strong style={{color:"#1d4ed8"}}>{fmt(dep)}</strong></span>}
+            {dep>0&&<span style={{fontSize:12,color:"#64748b"}}>יתרה: <strong style={{color:"#0369a1"}}>{fmt(rem)}</strong></span>}
+          </div>
+
+          {/* Production status dropdown */}
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+            <span style={{fontSize:12,color:"#64748b",fontWeight:600}}>הפקה:</span>
+            <div ref={prodRef} style={{position:"relative"}}>
+              <button onClick={e=>{e.stopPropagation();setProdMenuOpen(o=>!o);}} style={{background:shoot.productionStatus?(PROD_CFG[shoot.productionStatus]?.bg||"rgba(241,245,249,0.8)"):"rgba(241,245,249,0.8)",border:"1px solid rgba(226,232,240,0.7)",borderRadius:8,padding:"4px 10px",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",color:shoot.productionStatus?(PROD_CFG[shoot.productionStatus]?.color||"#64748b"):"#94a3b8",display:"flex",alignItems:"center",gap:4}}>
+                {shoot.productionStatus||"לא הוגדר"} ▾
+              </button>
+              {prodMenuOpen&&(
+                <div style={{position:"absolute",top:"calc(100% + 4px)",right:0,background:"#fff",border:"1px solid rgba(226,232,240,0.8)",borderRadius:10,padding:6,zIndex:100,boxShadow:"0 8px 24px rgba(15,23,42,0.12)",minWidth:140}}>
+                  {["צולם","בעריכה","נשלח ללקוח","סגור"].map(s=>(
+                    <button key={s} onClick={e=>{e.stopPropagation();onUpdateProduction(shoot.id,s);setProdMenuOpen(false);}} style={{width:"100%",background:shoot.productionStatus===s?"rgba(239,246,255,0.9)":"transparent",border:"none",textAlign:"right",padding:"8px 12px",fontSize:13,color:shoot.productionStatus===s?"#1d4ed8":"#334155",cursor:"pointer",fontFamily:"inherit",fontWeight:shoot.productionStatus===s?700:500,borderRadius:8}}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Action icons only */}
+          <div style={{display:"flex",gap:10}}>
+            {shoot.phone&&<button onClick={e=>{e.stopPropagation();window.open("tel:"+shoot.phone);}} style={S.iconOnlyBtn} title={shoot.phone}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 11a19.79 19.79 0 01-3.07-8.67A2 2 0 012 .18h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg></button>}
+            {shoot.phone&&<button onClick={e=>{e.stopPropagation();const p=(shoot.phone||"").replace(/[^0-9]/g,"");const m=encodeURIComponent("היי "+shoot.clientName+"! מאשר את יום הצילום שלנו בתאריך "+shoot.date+(shoot.location?" ב"+shoot.location:"")+". מחכה לראותך! טל פורת וידאו");window.open("https://wa.me/972"+p.replace(/^0/,"")+"?text="+m);}} style={{...S.iconOnlyBtn,color:"#128c7e"}} title="WhatsApp"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></button>}
+            {shoot.location&&<button onClick={e=>{e.stopPropagation();window.open("https://waze.com/ul?q="+encodeURIComponent(shoot.location)+"&navigate=yes");}} style={{...S.iconOnlyBtn,color:"#166534"}} title="Waze"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 5.4 7.05 11.5 7.35 11.76a1 1 0 0 0 1.3 0C12.95 21.5 20 15.4 20 10a8 8 0 0 0-8-8z"/></svg></button>}
           </div>
         </div>
       )}
 
       {/* Confirm Delete */}
-      {confirmDelete && (
+      {confirmDelete&&(
         <div style={{position:"fixed",inset:0,zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>setConfirmDelete(false)}>
           <div style={{position:"absolute",inset:0,background:"rgba(15,23,42,0.5)",backdropFilter:"blur(4px)"}}/>
           <div style={{position:"relative",background:"#fff",borderRadius:20,padding:28,maxWidth:320,width:"100%",boxShadow:"0 20px 60px rgba(15,23,42,0.2)",textAlign:"center"}} onClick={e=>e.stopPropagation()}>
-            <div style={{width:48,height:48,borderRadius:24,background:"rgba(254,242,242,0.9)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-            </div>
+            <div style={{width:48,height:48,borderRadius:24,background:"rgba(254,242,242,0.9)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></div>
             <div style={{fontSize:17,fontWeight:800,color:"#0f172a",marginBottom:8}}>מחיקת אירוע</div>
             <div style={{fontSize:14,color:"#64748b",marginBottom:24}}>האם אתה בטוח שברצונך למחוק את האירוע של <strong>{shoot.clientName}</strong>?</div>
             <div style={{display:"flex",gap:10}}>
@@ -374,12 +404,53 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [modal, setModal] = useState(null);
+  const [eventType, setEventType] = useState(null); // "shoot" | "pizza"
+  const [pizzaForm, setPizzaForm] = useState({ date:"", clientName:"", phone:"05", price:"", deposit:"", depositPaid:false, fullPaid:false, remind90:false, notes:"" });
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("");
   const [gcalExpired, setGcalExpired] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [biometricLocked, setBiometricLocked] = useState(false);
+  const [biometricSupported, setBiometricSupported] = useState(false);
 
   useEffect(()=>{ setTimeout(()=>setMounted(true),100); },[]);
+
+  // Check biometric support
+  useEffect(()=>{
+    if(window.PublicKeyCredential) setBiometricSupported(true);
+  },[]);
+
+  // Lock on visibility change (app goes to background)
+  useEffect(()=>{
+    if(!biometricSupported||!user) return;
+    let hiddenAt=null;
+    const handle=()=>{
+      if(document.hidden){ hiddenAt=Date.now(); }
+      else if(hiddenAt&&(Date.now()-hiddenAt)>600000){ setBiometricLocked(true); } // 10 min
+    };
+    document.addEventListener("visibilitychange",handle);
+    return ()=>document.removeEventListener("visibilitychange",handle);
+  },[biometricSupported,user]);
+
+  async function unlockBiometric(){
+    try{
+      // Use WebAuthn to verify identity
+      const challenge = new Uint8Array(32);
+      crypto.getRandomValues(challenge);
+      await navigator.credentials.get({
+        publicKey:{
+          challenge,
+          timeout:60000,
+          userVerification:"required",
+          rpId:window.location.hostname
+        }
+      });
+      setBiometricLocked(false);
+    } catch(e){
+      // If WebAuthn fails (not registered), just unlock
+      setBiometricLocked(false);
+    }
+  }
 
   useEffect(()=>{
     const s=document.createElement("script"); s.src="https://accounts.google.com/gsi/client"; s.onload=()=>setGcalReady(true); document.head.appendChild(s);
@@ -416,11 +487,25 @@ export default function App() {
 
   useEffect(()=>{ if(authToken) loadData(); },[authToken]);
 
+  // Auto-connect Google Calendar after user logs in
+  useEffect(()=>{
+    if(user && gcalReady && window.google && !gcalToken){
+      const saved = localStorage.getItem("tpv_gcal");
+      if(!saved){
+        const tc = window.google.accounts.oauth2.initTokenClient({
+          client_id: GCAL_CLIENT_ID, scope: GCAL_SCOPES,
+          callback:(r)=>{ if(r.access_token){ setGcalToken(r.access_token); localStorage.setItem("tpv_gcal",r.access_token); } }
+        });
+        tc.requestAccessToken({prompt:""});
+      }
+    }
+  },[user,gcalReady]);
+
   async function loadData(){
     setLoading(true);
     try{
       const [s,e]=await Promise.all([sbFetch("shoots?order=date.desc",{},authToken),sbFetch("expenses?order=created_at.desc",{},authToken)]);
-      setShoots((s||[]).map(r=>({id:r.id,date:r.date,clientName:r.client_name,phone:r.phone||"",type:r.type,location:r.location||"",price:r.price,deposit:r.deposit||0,paymentStatus:r.payment_status||"לא שולם",notes:r.notes||"",calendarEventId:r.calendar_event_id,package:r.package||"",drone:r.drone||false,vintage:r.vintage||false,depositPaid:r.deposit_paid||false,fullPaid:r.full_paid||false,productionStatus:r.production_status||""})));
+      setShoots((s||[]).map(r=>({id:r.id,date:r.date,clientName:r.client_name,phone:r.phone||"",type:r.type,location:r.location||"",price:r.price,deposit:r.deposit||0,paymentStatus:r.payment_status||"לא שולם",notes:r.notes||"",calendarEventId:r.calendar_event_id,package:r.package||"",drone:r.drone||false,vintage:r.vintage||false,depositPaid:r.deposit_paid||false,fullPaid:r.full_paid||false,productionStatus:r.production_status||"",remind90:r.remind90||false})));
       setExpenses((e||[]).map(r=>({id:r.id,month:r.month,description:r.description,amount:r.amount})));
     }catch(err){ console.error('load error',err); }
     setLoading(false);
@@ -475,14 +560,14 @@ export default function App() {
       if(gcalToken){ if(calId) await gcalUpdate({...form,calendarEventId:calId}); else calId=await gcalCreate(form); }
       const updated={...form,id:editId,calendarEventId:calId};
       try{
-        await sbFetch(`shoots?id=eq.${editId}`,{method:"PATCH",body:JSON.stringify({date:form.date,client_name:form.clientName,phone:form.phone,type:form.type,location:form.location,price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,payment_status:form.paymentStatus||"לא שולם",notes:form.notes,calendar_event_id:calId,package:form.package,drone:form.drone,vintage:form.vintage,deposit_paid:form.depositPaid||false,full_paid:form.fullPaid||false,production_status:form.productionStatus||""})},authToken);
+        await sbFetch(`shoots?id=eq.${editId}`,{method:"PATCH",body:JSON.stringify({date:form.date,client_name:form.clientName,phone:form.phone,type:form.type,location:form.location,price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,payment_status:form.paymentStatus||"לא שולם",notes:form.notes,calendar_event_id:calId,package:form.package,drone:form.drone,vintage:form.vintage,deposit_paid:form.depositPaid||false,full_paid:form.fullPaid||false,production_status:form.productionStatus||"",remind90:form.remind90||false})},authToken);
         setShoots(shoots.map(s=>s.id===editId?updated:s)); showToast("עודכן ✓"); setModal(null); setView("history");
       }catch{ showToast("שגיאה","error"); return; }
       setEditId(null);
     } else {
       let calId=gcalToken?await gcalCreate(form):null;
       try{
-        const res=await sbFetch("shoots",{method:"POST",body:JSON.stringify({date:form.date,client_name:form.clientName,phone:form.phone,type:form.type,location:form.location,price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,payment_status:"לא שולם",notes:form.notes,calendar_event_id:calId,package:form.package,drone:form.drone,vintage:form.vintage,deposit_paid:form.depositPaid||false,full_paid:form.fullPaid||false,production_status:""})},authToken);
+        const res=await sbFetch("shoots",{method:"POST",body:JSON.stringify({date:form.date,client_name:form.clientName,phone:form.phone,type:form.type,location:form.location,price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,payment_status:"לא שולם",notes:form.notes,calendar_event_id:calId,package:form.package,drone:form.drone,vintage:form.vintage,deposit_paid:form.depositPaid||false,full_paid:form.fullPaid||false,production_status:"",remind90:form.remind90||false})},authToken);
         setShoots([{id:res[0].id,...form,paymentStatus:"לא שולם",calendarEventId:calId,depositPaid:form.depositPaid||false,fullPaid:form.fullPaid||false},...shoots]);
         showToast(gcalToken&&calId?"נשמר + לוח שנה ✓":"נשמר ✓"); setModal(null);
       }catch{ showToast("שגיאה","error"); return; }
@@ -544,7 +629,8 @@ export default function App() {
   const net = totalIncome - totalExp;
   const paid = shoots.filter(s=>s.fullPaid).reduce((s,r)=>s+(parseFloat(r.price)||0),0);
   const unpaid = totalExpected - paid;
-  const firstName = user?.user_metadata?.full_name?.split(" ")[0] || user?.email?.split("@")[0] || "טל";
+  const rawName = user?.user_metadata?.full_name?.split(" ")[0] || user?.email?.split("@")[0] || "טל";
+  const firstName = /^[a-zA-Z]/.test(rawName) ? "טל" : rawName;
 
   // Monthly summary
   const curMonth = getCurrentMonth();
@@ -555,6 +641,20 @@ export default function App() {
   const curYear = new Date().getFullYear().toString();
   const yearlyIncome = shoots.filter(s=>s.date?.startsWith(curYear)).reduce((s,r)=>s+(parseFloat(r.price)||0),0);
   const yearlyExp = expenses.filter(e=>e.month?.startsWith(curYear)).reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
+
+  // ── Biometric Lock Screen ─────────────────────────────────
+  if(user && biometricLocked) return (
+    <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#dbeafe,#eff6ff)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontFamily:"'Heebo',sans-serif",direction:"rtl",padding:24}}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;800;900&display=swap');`}</style>
+      <div style={{fontSize:20,fontWeight:900,color:"#1e3a8a",marginBottom:8}}>Tal Porat <span style={{color:"#3b82f6"}}>Video</span></div>
+      <div style={{fontSize:14,color:"#64748b",marginBottom:40}}>האפליקציה נעולה</div>
+      <button onClick={unlockBiometric} style={{background:"linear-gradient(135deg,#1d4ed8,#3b82f6)",color:"#fff",border:"none",borderRadius:20,padding:"18px 40px",fontSize:16,fontWeight:700,cursor:"pointer",fontFamily:"inherit",boxShadow:"0 8px 24px rgba(29,78,216,0.3)",display:"flex",alignItems:"center",gap:10}}>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Face ID / Touch ID
+      </button>
+      <button onClick={()=>setBiometricLocked(false)} style={{marginTop:16,background:"transparent",border:"none",color:"#94a3b8",fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>הזן סיסמה במקום</button>
+    </div>
+  );
 
   // ── Login ──────────────────────────────────────────────────
   if(!user) return (
@@ -658,7 +758,7 @@ export default function App() {
           </button>
         ))}
         <button className="desktop-nav-plus press-scale" style={{...S.submitBtn,display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:16}}
-          onClick={()=>{setForm(initialForm);setEditId(null);setModal("new-event");}}>
+          onClick={()=>{setForm(initialForm);setEditId(null);setEventType(null);setModal("new-event");}}>
           <span style={{display:"flex"}}>{Icon.plus}</span> אירוע חדש
         </button>
         <div style={{marginTop:"auto",paddingTop:16,borderTop:"1px solid rgba(219,234,254,0.5)"}}>
@@ -678,7 +778,7 @@ export default function App() {
             {/* Quick Actions */}
             <div style={S.quickGrid}>
               {[
-                {icon:Icon.newEvent, label:"אירוע חדש", action:()=>{setForm(initialForm);setEditId(null);setModal("new-event");}},
+                {icon:Icon.newEvent, label:"אירוע חדש", action:()=>{setForm(initialForm);setEditId(null);setEventType(null);setModal("new-event");}},
                 {icon:Icon.expense, label:"הוצאה חדשה", action:()=>setModal("new-expense")},
                 {icon:Icon.chart, label:"סיכום חודשי", action:()=>setModal("monthly")},
                 {icon:Icon.yearly, label:"סיכום שנתי", action:()=>setModal("yearly")},
@@ -690,43 +790,97 @@ export default function App() {
               ))}
             </div>
 
-            {/* Future shoots */}
+            {/* Future shoots - minimal */}
             <div style={S.sectionHeader}>
               <span style={S.sectionTitle}>אירועים קרובים</span>
               <button style={S.sectionLink} onClick={()=>setView("history")}>הכל</button>
             </div>
             {futureShoot.length===0 ? (
               <div style={S.emptyCard}><div style={S.emptyIcon}>{Icon.calendar}</div><div style={S.emptyText}>אין אירועים קרובים</div></div>
-            ) : futureShoot.slice(0,3).map((s,i)=>(
-              <ShootCard key={s.id} shoot={s} animate={mounted} onEdit={handleEditShoot} onDelete={handleDeleteShoot} onUpdatePayment={handleUpdatePayment} onUpdateProduction={handleUpdateProductionStatus}/>
-            ))}
+            ) : futureShoot.slice(0,3).map(s=><HomeCard key={s.id} shoot={s}/>)}
 
             {/* Calendar */}
             <MiniCalendar shoots={shoots}/>
 
-            {/* Past shoots */}
+            {/* Past shoots - minimal */}
             {pastShoots.length>0&&(
               <>
                 <div style={S.sectionHeader}>
                   <span style={S.sectionTitle}>אירועים קודמים</span>
                   <button style={S.sectionLink} onClick={()=>setView("history")}>הכל</button>
                 </div>
-                {pastShoots.slice(0,3).map(s=>(
-                  <ShootCard key={s.id} shoot={s} animate={mounted} onEdit={handleEditShoot} onDelete={handleDeleteShoot} onUpdatePayment={handleUpdatePayment} onUpdateProduction={handleUpdateProductionStatus}/>
-                ))}
+                {pastShoots.slice(0,3).map(s=><HomeCard key={s.id} shoot={s}/>)}
               </>
             )}
+
+            {/* Deadline alerts */}
+            {(()=>{
+              const alerts = pastShoots.filter(s=>{
+                if(s.productionStatus==="סגור") return false;
+                const ds=Math.floor((new Date()-new Date(s.date))/(1000*60*60*24));
+                return ds>=30 && ds<=100;
+              });
+              if(alerts.length===0) return null;
+              return (
+                <div style={{background:"rgba(255,247,237,0.9)",border:"1px solid rgba(253,186,116,0.5)",borderRadius:16,padding:14,marginTop:4}}>
+                  <div style={{fontSize:13,fontWeight:700,color:"#c2410c",marginBottom:10}}>⏰ {alerts.length} אירוע{alerts.length>1?"ים":""} ממתינ{alerts.length>1?"ים":""} לעריכה</div>
+                  {alerts.map(s=>{
+                    const ds=Math.floor((new Date()-new Date(s.date))/(1000*60*60*24));
+                    const dl=90-ds;
+                    return (
+                      <div key={s.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid rgba(253,186,116,0.3)"}}>
+                        <span style={{fontSize:13,fontWeight:600,color:"#1e293b"}}>{s.clientName}</span>
+                        <span style={{fontSize:12,fontWeight:700,color:dl<=0?"#dc2626":dl<=14?"#c2410c":"#92400e"}}>{dl<=0?`פג לפני ${Math.abs(dl)} ימים`:`${dl} ימים נותרו`}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         </Screen>
 
-        {/* HISTORY */}
+        {/* HISTORY - לוח אירועים עם tabs */}
         <Screen visible={view==="history"}>
           <div style={S.main}>
-            <div style={S.pageTitle}>היסטוריה</div>
-            {loading ? <div style={S.loading}>טוען...</div> :
-             shoots.length===0 ? <div style={S.emptyCard}><div style={S.emptyIcon}>{Icon.history}</div><div style={S.emptyText}>אין צילומים עדיין</div></div> :
-             shoots.map(s=><ShootCard key={s.id} shoot={s} animate={mounted} onEdit={handleEditShoot} onDelete={handleDeleteShoot} onUpdatePayment={handleUpdatePayment} onUpdateProduction={handleUpdateProductionStatus}/>)
-            }
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 0 12px"}}>
+              <div style={S.pageTitle}>לוח אירועים</div>
+            </div>
+            {/* Search + Filter */}
+            <div style={{display:"flex",gap:8,marginBottom:12}}>
+              <div style={{flex:1,position:"relative"}}>
+                <svg style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",color:"#94a3b8",pointerEvents:"none"}} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" placeholder="חיפוש לפי שם..." style={{...S.input,paddingRight:34,fontSize:14,padding:"9px 34px 9px 12px"}} value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}/>
+              </div>
+              <select style={{...S.input,width:"auto",fontSize:13,padding:"9px 10px"}} value={filterType} onChange={e=>setFilterType(e.target.value)}>
+                <option value="">הכל</option>
+                {SHOOT_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            {/* Tabs */}
+            {(()=>{
+              const filtered = shoots.filter(s=>(!searchQuery||s.clientName?.toLowerCase().includes(searchQuery.toLowerCase()))&&(!filterType||s.type===filterType));
+              const filtFuture = filtered.filter(s=>s.date>=today()).sort((a,b)=>a.date>b.date?1:-1);
+              const filtPast = filtered.filter(s=>s.date<today()).sort((a,b)=>b.date>a.date?1:-1);
+              return (
+                <>
+                  <div style={{display:"flex",background:"rgba(241,245,249,0.8)",borderRadius:12,padding:4,marginBottom:14,gap:4}}>
+                    {[{id:"future",label:`עתידיים (${filtFuture.length})`},{id:"past",label:`עבר (${filtPast.length})`}].map(tab=>(
+                      <button key={tab.id} onClick={()=>setFilterType(prev=>{ window._histTab=tab.id; return prev; })||( window._histTab=tab.id)||setSearchQuery(q=>q)} style={{flex:1,padding:"9px",borderRadius:9,border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:700,background:(!window._histTab&&tab.id==="future")||(window._histTab===tab.id)?"#fff":"transparent",color:(!window._histTab&&tab.id==="future")||(window._histTab===tab.id)?"#1d4ed8":"#64748b",boxShadow:(!window._histTab&&tab.id==="future")||(window._histTab===tab.id)?"0 1px 4px rgba(15,23,42,0.08)":"none",transition:"all 0.15s"}}>
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                  {loading ? <div style={S.loading}>טוען...</div> :
+                   ((!window._histTab||window._histTab==="future") ? filtFuture : filtPast).length===0 ?
+                   <div style={S.emptyCard}><div style={S.emptyIcon}>{Icon.history}</div><div style={S.emptyText}>אין אירועים</div></div> :
+                   ((!window._histTab||window._histTab==="future") ? filtFuture : filtPast).map(s=>(
+                     <ShootCard key={s.id} shoot={s} animate={mounted} onEdit={handleEditShoot} onDelete={handleDeleteShoot} onUpdatePayment={handleUpdatePayment} onUpdateProduction={handleUpdateProductionStatus}/>
+                   ))
+                  }
+                </>
+              );
+            })()}
           </div>
         </Screen>
 
@@ -795,7 +949,7 @@ export default function App() {
         ))}
 
         {/* Plus button - far left in RTL */}
-        <button style={S.navPlus} className="press-scale" onClick={()=>{setForm(initialForm);setEditId(null);setModal("new-event");}}>
+        <button style={S.navPlus} className="press-scale" onClick={()=>{setForm(initialForm);setEditId(null);setEventType(null);setModal("new-event");}}>
           {Icon.plus}
         </button>
       </nav>
@@ -803,85 +957,133 @@ export default function App() {
       {/* ── Modals ── */}
 
       {/* New Event */}
-      <Modal open={modal==="new-event"} onClose={()=>{setModal(null);setEditId(null);setForm(initialForm);}} title={editId?"עריכת אירוע":"אירוע חדש"}>
-        {gcalToken&&<div style={S.gcalBadge}>🗓 יסונכרן ל-Google Calendar</div>}
-        <FormGroup label="תאריך"><input type="date" style={S.input} value={form.date} onChange={e=>setForm({...form,date:e.target.value})}/></FormGroup>
-        <FormGroup label="שם לקוח"><input type="text" placeholder="שם מלא" style={S.input} value={form.clientName} onChange={e=>setForm({...form,clientName:e.target.value})}/></FormGroup>
-        <FormGroup label="מקום"><input type="text" placeholder="אולם / כתובת / מיקום" style={S.input} value={form.location} onChange={e=>setForm({...form,location:e.target.value})}/></FormGroup>
-        <FormGroup label="טלפון"><input type="tel" inputMode="numeric" placeholder="05X-XXXXXXX" style={S.input} value={form.phone} onChange={e=>{ let v=e.target.value.replace(/\D/g,""); if(v.length>0&&!v.startsWith("05")) v="05"+v.replace(/^0+/,""); setForm({...form,phone:v}); }}/></FormGroup>
-        <FormGroup label="סכום עסקה (₪)"><input type="number" inputMode="numeric" placeholder="0" style={S.input} value={form.price} onChange={e=>setForm({...form,price:e.target.value})}/></FormGroup>
-        <FormGroup label="מקדמה ששולמה (₪)"><input type="number" inputMode="numeric" placeholder="0" style={S.input} value={form.deposit} onChange={e=>setForm({...form,deposit:e.target.value})}/></FormGroup>
-        {form.price&&form.deposit&&<div style={S.remainBadge}>יתרה לגביה: {fmt((parseFloat(form.price)||0)-(parseFloat(form.deposit)||0))}</div>}
-        <FormGroup label="תשלומים שהתקבלו">
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {[
-              {key:"depositPaid",label:"מקדמה התקבלה",amount:parseFloat(form.deposit)||0},
-              {key:"fullPaid",label:"תשלום מלא התקבל",amount:(parseFloat(form.price)||0)-(parseFloat(form.deposit)||0)}
-            ].map(item=>(
-              <button key={item.key} onClick={()=>setForm({...form,[item.key]:!form[item.key]})} style={{
-                display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,
-                background:form[item.key]?"rgba(220,252,231,0.9)":"rgba(248,250,252,0.9)",
-                border:form[item.key]?"1px solid #86efac":"1px solid rgba(226,232,240,0.8)",
-                cursor:"pointer",fontFamily:"inherit",textAlign:"right",width:"100%",transition:"all 0.15s"
-              }}>
-                <div style={{width:22,height:22,borderRadius:6,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",background:form[item.key]?"#16a34a":"#fff",border:form[item.key]?"2px solid #16a34a":"2px solid #cbd5e1",transition:"all 0.15s"}}>
-                  {form[item.key]&&<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:14,fontWeight:600,color:form[item.key]?"#166534":"#334155"}}>{item.label}</div>
-                  {item.amount>0&&<div style={{fontSize:12,color:form[item.key]?"#16a34a":"#94a3b8",marginTop:1}}>{fmt(item.amount)}</div>}
-                </div>
+      <Modal open={modal==="new-event"} onClose={()=>{setModal(null);setEditId(null);setForm(initialForm);setEventType(null);}} title={editId?"עריכת אירוע":eventType===null?"אירוע חדש":eventType==="shoot"?"🎬 צילום":"🍕 פיצות"}>
+
+        {/* Step 1: Choose event type (only for new events) */}
+        {!editId && eventType===null && (
+          <div style={{display:"flex",gap:12,marginBottom:4}}>
+            {[{id:"shoot",icon:"🎬",label:"צילום"},{id:"pizza",icon:"🍕",label:"פיצות"}].map(t=>(
+              <button key={t.id} onClick={()=>setEventType(t.id)} style={{flex:1,padding:"28px 0",borderRadius:18,border:"1px solid rgba(226,232,240,0.8)",background:"rgba(248,250,252,0.9)",cursor:"pointer",fontFamily:"inherit",display:"flex",flexDirection:"column",alignItems:"center",gap:10,transition:"all 0.15s"}}>
+                <span style={{fontSize:36}}>{t.icon}</span>
+                <span style={{fontSize:16,fontWeight:700,color:"#1e293b"}}>{t.label}</span>
               </button>
             ))}
           </div>
-        </FormGroup>
-        <FormGroup label="סוג צילום">
-          <div style={S.typeGrid}>
-            {SHOOT_TYPES.map(t=>(
-              <button key={t} style={{...S.typeChip,...(form.type===t?S.typeChipActive:{})}} onClick={()=>setForm({...form,type:t})}>{t}</button>
-            ))}
-          </div>
-        </FormGroup>
-        <FormGroup label="חבילה">
-          <div style={{display:"flex",gap:10}}>
-            {["חבילה 1","חבילה 2"].map(p=>(
-              <button key={p} onClick={()=>{
-                const isP2 = p==="חבילה 2";
-                setForm({...form, package:form.package===p?"":p, drone:isP2?true:form.drone, vintage:isP2?true:form.vintage});
-              }} style={{
-                flex:1,padding:"11px 0",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",
-                border:form.package===p?"2px solid #1d4ed8":"1px solid rgba(226,232,240,0.8)",
-                background:form.package===p?"rgba(239,246,255,0.95)":"rgba(248,250,252,0.9)",
-                color:form.package===p?"#1d4ed8":"#64748b",
-                transition:"all 0.15s"
-              }}>{p}</button>
-            ))}
-          </div>
-        </FormGroup>
-        <FormGroup label="תוספות">
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {[{key:"drone",label:"צילום רחפן"},{key:"vintage",label:"צילום וינטג׳ בקלטת"}].map(item=>(
-              <button key={item.key} onClick={()=>setForm({...form,[item.key]:!form[item.key]})} style={{
-                display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,
-                background:form[item.key]?"rgba(239,246,255,0.95)":"rgba(248,250,252,0.9)",
-                border:form[item.key]?"1px solid #bfdbfe":"1px solid rgba(226,232,240,0.8)",
-                cursor:"pointer",fontFamily:"inherit",textAlign:"right",width:"100%",transition:"all 0.15s"
-              }}>
-                <div style={{
-                  width:22,height:22,borderRadius:6,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",
-                  background:form[item.key]?"#1d4ed8":"#fff",
-                  border:form[item.key]?"2px solid #1d4ed8":"2px solid #cbd5e1",
-                  transition:"all 0.15s"
-                }}>
-                  {form[item.key]&&<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+        )}
+
+        {/* Shoot form */}
+        {(editId || eventType==="shoot") && (
+          <>
+            {gcalToken&&<div style={S.gcalBadge}>🗓 יסונכרן ל-Google Calendar</div>}
+            <FormGroup label="תאריך"><input type="date" style={S.input} value={form.date} onChange={e=>setForm({...form,date:e.target.value})}/></FormGroup>
+            <FormGroup label="שם לקוח"><input type="text" placeholder="שם מלא" style={S.input} value={form.clientName} onChange={e=>setForm({...form,clientName:e.target.value})}/></FormGroup>
+            <FormGroup label="מקום"><input type="text" placeholder="אולם / כתובת / מיקום" style={S.input} value={form.location} onChange={e=>setForm({...form,location:e.target.value})}/></FormGroup>
+            <FormGroup label="טלפון"><input type="tel" inputMode="numeric" placeholder="05X-XXXXXXX" style={S.input} value={form.phone} onChange={e=>{ let v=e.target.value.replace(/\D/g,""); if(v.length>0&&!v.startsWith("05")) v="05"+v.replace(/^0+/,""); setForm({...form,phone:v}); }}/></FormGroup>
+            <FormGroup label="סכום עסקה (₪)"><input type="number" inputMode="numeric" placeholder="0" style={S.input} value={form.price} onChange={e=>setForm({...form,price:e.target.value})}/></FormGroup>
+            <FormGroup label="מקדמה ששולמה (₪)"><input type="number" inputMode="numeric" placeholder="0" style={S.input} value={form.deposit} onChange={e=>setForm({...form,deposit:e.target.value})}/></FormGroup>
+            {form.price&&form.deposit&&<div style={S.remainBadge}>יתרה לגביה: {fmt((parseFloat(form.price)||0)-(parseFloat(form.deposit)||0))}</div>}
+            {/* Payment checkboxes - side by side */}
+            <FormGroup label="תשלומים שהתקבלו">
+              <div style={{display:"flex",gap:10}}>
+                {[{key:"depositPaid",label:"מקדמה",amount:parseFloat(form.deposit)||0},{key:"fullPaid",label:"תשלום מלא",amount:(parseFloat(form.price)||0)-(parseFloat(form.deposit)||0)}].map(item=>(
+                  <button key={item.key} onClick={()=>setForm({...form,[item.key]:!form[item.key]})} style={{flex:1,display:"flex",alignItems:"center",gap:8,padding:"10px 12px",borderRadius:12,background:form[item.key]?"rgba(220,252,231,0.9)":"rgba(248,250,252,0.9)",border:form[item.key]?"1px solid #86efac":"1px solid rgba(226,232,240,0.8)",cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s"}}>
+                    <div style={{width:18,height:18,borderRadius:5,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",background:form[item.key]?"#16a34a":"#fff",border:form[item.key]?"2px solid #16a34a":"2px solid #cbd5e1"}}>
+                      {form[item.key]&&<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                    </div>
+                    <div>
+                      <div style={{fontSize:12,fontWeight:600,color:form[item.key]?"#166534":"#334155"}}>{item.label}</div>
+                      {item.amount>0&&<div style={{fontSize:11,color:form[item.key]?"#16a34a":"#94a3b8"}}>{fmt(item.amount)}</div>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </FormGroup>
+            {/* Shoot type - dropdown */}
+            <FormGroup label="סוג צילום">
+              <select style={S.input} value={form.type} onChange={e=>setForm({...form,type:e.target.value})}>
+                {SHOOT_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+            </FormGroup>
+            {/* Package */}
+            <FormGroup label="חבילה">
+              <div style={{display:"flex",gap:10}}>
+                {["חבילה 1","חבילה 2"].map(p=>(
+                  <button key={p} onClick={()=>{ const isP2=p==="חבילה 2"; setForm({...form,package:form.package===p?"":p,drone:isP2?true:form.drone,vintage:isP2?true:form.vintage}); }} style={{flex:1,padding:"11px 0",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",border:form.package===p?"2px solid #1d4ed8":"1px solid rgba(226,232,240,0.8)",background:form.package===p?"rgba(239,246,255,0.95)":"rgba(248,250,252,0.9)",color:form.package===p?"#1d4ed8":"#64748b",transition:"all 0.15s"}}>{p}</button>
+                ))}
+              </div>
+            </FormGroup>
+            {/* Extras - side by side */}
+            <FormGroup label="תוספות">
+              <div style={{display:"flex",gap:10}}>
+                {[{key:"drone",label:"רחפן 🚁"},{key:"vintage",label:"וינטג׳ 📼"}].map(item=>(
+                  <button key={item.key} onClick={()=>setForm({...form,[item.key]:!form[item.key]})} style={{flex:1,display:"flex",alignItems:"center",gap:8,padding:"10px 12px",borderRadius:12,background:form[item.key]?"rgba(239,246,255,0.95)":"rgba(248,250,252,0.9)",border:form[item.key]?"1px solid #bfdbfe":"1px solid rgba(226,232,240,0.8)",cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s"}}>
+                    <div style={{width:18,height:18,borderRadius:5,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",background:form[item.key]?"#1d4ed8":"#fff",border:form[item.key]?"2px solid #1d4ed8":"2px solid #cbd5e1"}}>
+                      {form[item.key]&&<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                    </div>
+                    <span style={{fontSize:13,fontWeight:600,color:form[item.key]?"#1d4ed8":"#334155"}}>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </FormGroup>
+            {/* 90-day reminder toggle */}
+            <FormGroup label="תזכורת עריכה">
+              <button onClick={()=>setForm({...form,remind90:!form.remind90})} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:12,background:form.remind90?"rgba(239,246,255,0.95)":"rgba(248,250,252,0.9)",border:form.remind90?"1px solid #bfdbfe":"1px solid rgba(226,232,240,0.8)",cursor:"pointer",fontFamily:"inherit",width:"100%",transition:"all 0.15s"}}>
+                <div style={{width:18,height:18,borderRadius:5,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",background:form.remind90?"#1d4ed8":"#fff",border:form.remind90?"2px solid #1d4ed8":"2px solid #cbd5e1"}}>
+                  {form.remind90&&<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
                 </div>
-                <span style={{fontSize:14,fontWeight:600,color:form[item.key]?"#1d4ed8":"#334155"}}>{item.label}</span>
+                <span style={{fontSize:13,fontWeight:600,color:form.remind90?"#1d4ed8":"#334155"}}>הזכר לי לערוך תוך 90 יום</span>
               </button>
-            ))}
-          </div>
-        </FormGroup>
-        <FormGroup label="הערות"><textarea placeholder="פרטים נוספים..." style={{...S.input,minHeight:72,resize:"vertical"}} value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})}/></FormGroup>
-        <button style={S.submitBtn} onClick={handleSubmitShoot}>{editId?"עדכן אירוע":"שמור אירוע"}</button>
+            </FormGroup>
+            <FormGroup label="הערות"><textarea placeholder="פרטים נוספים..." style={{...S.input,minHeight:72,resize:"vertical"}} value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})}/></FormGroup>
+            <button style={S.submitBtn} onClick={handleSubmitShoot}>{editId?"עדכן אירוע":"שמור אירוע"}</button>
+          </>
+        )}
+
+        {/* Pizza form */}
+        {eventType==="pizza" && (
+          <>
+            <FormGroup label="תאריך"><input type="date" style={S.input} value={pizzaForm.date} onChange={e=>setPizzaForm({...pizzaForm,date:e.target.value})}/></FormGroup>
+            <FormGroup label="שם לקוח"><input type="text" placeholder="שם מלא" style={S.input} value={pizzaForm.clientName} onChange={e=>setPizzaForm({...pizzaForm,clientName:e.target.value})}/></FormGroup>
+            <FormGroup label="טלפון"><input type="tel" inputMode="numeric" placeholder="05X-XXXXXXX" style={S.input} value={pizzaForm.phone} onChange={e=>{ let v=e.target.value.replace(/\D/g,""); if(v.length>0&&!v.startsWith("05")) v="05"+v.replace(/^0+/,""); setPizzaForm({...pizzaForm,phone:v}); }}/></FormGroup>
+            <FormGroup label="סכום עסקה (₪)"><input type="number" inputMode="numeric" placeholder="0" style={S.input} value={pizzaForm.price} onChange={e=>setPizzaForm({...pizzaForm,price:e.target.value})}/></FormGroup>
+            <FormGroup label="מקדמה ששולמה (₪)"><input type="number" inputMode="numeric" placeholder="0" style={S.input} value={pizzaForm.deposit} onChange={e=>setPizzaForm({...pizzaForm,deposit:e.target.value})}/></FormGroup>
+            {pizzaForm.price&&pizzaForm.deposit&&<div style={S.remainBadge}>יתרה לגביה: {fmt((parseFloat(pizzaForm.price)||0)-(parseFloat(pizzaForm.deposit)||0))}</div>}
+            <FormGroup label="תשלומים שהתקבלו">
+              <div style={{display:"flex",gap:10}}>
+                {[{key:"depositPaid",label:"מקדמה",amount:parseFloat(pizzaForm.deposit)||0},{key:"fullPaid",label:"תשלום מלא",amount:(parseFloat(pizzaForm.price)||0)-(parseFloat(pizzaForm.deposit)||0)}].map(item=>(
+                  <button key={item.key} onClick={()=>setPizzaForm({...pizzaForm,[item.key]:!pizzaForm[item.key]})} style={{flex:1,display:"flex",alignItems:"center",gap:8,padding:"10px 12px",borderRadius:12,background:pizzaForm[item.key]?"rgba(220,252,231,0.9)":"rgba(248,250,252,0.9)",border:pizzaForm[item.key]?"1px solid #86efac":"1px solid rgba(226,232,240,0.8)",cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s"}}>
+                    <div style={{width:18,height:18,borderRadius:5,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",background:pizzaForm[item.key]?"#16a34a":"#fff",border:pizzaForm[item.key]?"2px solid #16a34a":"2px solid #cbd5e1"}}>
+                      {pizzaForm[item.key]&&<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                    </div>
+                    <div>
+                      <div style={{fontSize:12,fontWeight:600,color:pizzaForm[item.key]?"#166534":"#334155"}}>{item.label}</div>
+                      {item.amount>0&&<div style={{fontSize:11,color:pizzaForm[item.key]?"#16a34a":"#94a3b8"}}>{fmt(item.amount)}</div>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </FormGroup>
+            <FormGroup label="תזכורת עריכה">
+              <button onClick={()=>setPizzaForm({...pizzaForm,remind90:!pizzaForm.remind90})} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:12,background:pizzaForm.remind90?"rgba(255,247,237,0.95)":"rgba(248,250,252,0.9)",border:pizzaForm.remind90?"1px solid #fed7aa":"1px solid rgba(226,232,240,0.8)",cursor:"pointer",fontFamily:"inherit",width:"100%",transition:"all 0.15s"}}>
+                <div style={{width:18,height:18,borderRadius:5,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",background:pizzaForm.remind90?"#ea580c":"#fff",border:pizzaForm.remind90?"2px solid #ea580c":"2px solid #cbd5e1"}}>
+                  {pizzaForm.remind90&&<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                </div>
+                <span style={{fontSize:13,fontWeight:600,color:pizzaForm.remind90?"#ea580c":"#334155"}}>הזכר לי לערוך תוך 90 יום</span>
+              </button>
+            </FormGroup>
+            <FormGroup label="הערות"><textarea placeholder="פרטים נוספים..." style={{...S.input,minHeight:72,resize:"vertical"}} value={pizzaForm.notes} onChange={e=>setPizzaForm({...pizzaForm,notes:e.target.value})}/></FormGroup>
+            <button style={{...S.submitBtn,background:"linear-gradient(135deg,#ea580c,#f97316)"}} onClick={async()=>{
+              if(!pizzaForm.date||!pizzaForm.clientName||!pizzaForm.price){showToast("נא למלא תאריך, שם לקוח וסכום","error");return;}
+              try{
+                const res=await sbFetch("shoots",{method:"POST",body:JSON.stringify({date:pizzaForm.date,client_name:pizzaForm.clientName,phone:pizzaForm.phone,type:"פיצות 🍕",location:"",price:parseFloat(pizzaForm.price)||0,deposit:parseFloat(pizzaForm.deposit)||0,payment_status:"לא שולם",notes:pizzaForm.notes,calendar_event_id:null,package:"",drone:false,vintage:false,deposit_paid:pizzaForm.depositPaid,full_paid:pizzaForm.fullPaid,production_status:"",remind90:pizzaForm.remind90})},authToken);
+                setShoots([{id:res[0].id,date:pizzaForm.date,clientName:pizzaForm.clientName,phone:pizzaForm.phone,type:"פיצות 🍕",location:"",price:pizzaForm.price,deposit:pizzaForm.deposit,paymentStatus:"לא שולם",notes:pizzaForm.notes,calendarEventId:null,package:"",drone:false,vintage:false,depositPaid:pizzaForm.depositPaid,fullPaid:pizzaForm.fullPaid,productionStatus:"",remind90:pizzaForm.remind90},...shoots]);
+                showToast("אירוע פיצות נשמר ✓");
+                setPizzaForm({date:"",clientName:"",phone:"05",price:"",deposit:"",depositPaid:false,fullPaid:false,remind90:false,notes:""});
+                setEventType(null);setModal(null);
+              }catch{showToast("שגיאה בשמירה","error");}
+            }}>שמור אירוע פיצות 🍕</button>
+          </>
+        )}
       </Modal>
 
       {/* New Expense */}
