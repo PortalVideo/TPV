@@ -33,7 +33,7 @@ async function sbAuth(action, body) {
 }
 
 const SHOOT_TYPES = ["חתונות / אירועים", "תוכן לרשתות חברתיות", "פרסומות / קומרשיאל", "קליפים מוזיקליים", "תדמית לעסקים", "אחר"];
-const initialForm = { date: "", clientName: "", location: "", phone: "05", price: "", deposit: "", type: "חתונות / אירועים", notes: "", calendarEventId: null, package: "", drone: false, vintage: false };
+const initialForm = { date: "", clientName: "", location: "", phone: "05", price: "", deposit: "", type: "חתונות / אירועים", notes: "", calendarEventId: null };
 
 function fmt(n) { return Number(n || 0).toLocaleString("he-IL") + " ₪"; }
 function getCurrentMonth() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; }
@@ -93,36 +93,84 @@ function Modal({ open, onClose, title, children }) {
   );
 }
 
-// ── Mini Calendar ──────────────────────────────────────────────
+// ── Calendar (Month + Year view) ──────────────────────────────
 function MiniCalendar({ shoots }) {
   const [cur, setCur] = useState(new Date());
+  const [calView, setCalView] = useState("month"); // "month" | "year"
   const y = cur.getFullYear(), m = cur.getMonth();
-  const first = new Date(y, m, 1).getDay();
-  const days = new Date(y, m+1, 0).getDate();
   const MONTHS = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
   const DAY_NAMES = ["א","ב","ג","ד","ה","ו","ש"];
+  const td = new Date();
+
+  // Shoots per month for year view
+  const shootsPerMonth = {};
+  shoots.forEach(s => {
+    if (!s.date) return;
+    const key = s.date.slice(0,7);
+    shootsPerMonth[key] = (shootsPerMonth[key]||0) + 1;
+  });
+
+  // Month view cells
+  const first = new Date(y, m, 1).getDay();
+  const days = new Date(y, m+1, 0).getDate();
   const shootDates = {};
   shoots.forEach(s => { if (!s.date) return; const d = new Date(s.date); if (d.getFullYear()===y && d.getMonth()===m) shootDates[d.getDate()] = s; });
-  const td = new Date(); const isToday = d => d===td.getDate() && m===td.getMonth() && y===td.getFullYear();
+  const isToday = d => d===td.getDate() && m===td.getMonth() && y===td.getFullYear();
   const cells = []; const start = (first+1)%7;
   for (let i=0;i<start;i++) cells.push(null);
   for (let d=1;d<=days;d++) cells.push(d);
+
   return (
     <div style={S.calWrap}>
       <div style={S.calHead}>
-        <button style={S.calNav} onClick={()=>setCur(new Date(y,m-1,1))}>‹</button>
-        <span style={S.calTitle}>{MONTHS[m]} {y}</span>
-        <button style={S.calNav} onClick={()=>setCur(new Date(y,m+1,1))}>›</button>
+        {calView==="month" ? (
+          <>
+            <button style={S.calNav} onClick={()=>setCur(new Date(y,m-1,1))}>‹</button>
+            <button style={{background:"none",border:"none",cursor:"pointer",fontFamily:"inherit"}} onClick={()=>setCalView("year")}>
+              <span style={{...S.calTitle,color:"#1d4ed8",textDecoration:"underline",textDecorationStyle:"dotted"}}>{MONTHS[m]} {y}</span>
+            </button>
+            <button style={S.calNav} onClick={()=>setCur(new Date(y,m+1,1))}>›</button>
+          </>
+        ) : (
+          <>
+            <button style={S.calNav} onClick={()=>setCur(new Date(y-1,0,1))}>‹</button>
+            <button style={{background:"none",border:"none",cursor:"pointer",fontFamily:"inherit"}} onClick={()=>setCalView("month")}>
+              <span style={{...S.calTitle,color:"#1d4ed8"}}>{y}</span>
+            </button>
+            <button style={S.calNav} onClick={()=>setCur(new Date(y+1,0,1))}>›</button>
+          </>
+        )}
       </div>
-      <div style={S.calGrid}>
-        {DAY_NAMES.map(d=><div key={d} style={S.calDayName}>{d}</div>)}
-        {cells.map((d,i)=>(
-          <div key={i} style={{ ...S.calCell, ...(d&&isToday(d)?S.calToday:{}), ...(d&&shootDates[d]?S.calHasShoot:{}), ...(d===null?{background:"transparent",border:"none"}:{}) }}>
-            {d && <span style={{ fontSize: 12, fontWeight: isToday(d)?800:500, color: isToday(d)?"#fff": shootDates[d]?"#1d4ed8":"#334155" }}>{d}</span>}
-            {d && shootDates[d] && <div style={S.calDot}/>}
-          </div>
-        ))}
-      </div>
+
+      {calView==="month" ? (
+        <div style={S.calGrid}>
+          {DAY_NAMES.map(d=><div key={d} style={S.calDayName}>{d}</div>)}
+          {cells.map((d,i)=>(
+            <div key={i} style={{ ...S.calCell, ...(d&&isToday(d)?S.calToday:{}), ...(d&&shootDates[d]?S.calHasShoot:{}), ...(d===null?{background:"transparent",border:"none"}:{}) }}>
+              {d && <span style={{ fontSize: 12, fontWeight: isToday(d)?800:500, color: isToday(d)?"#fff": shootDates[d]?"#1d4ed8":"#334155" }}>{d}</span>}
+              {d && shootDates[d] && <div style={S.calDot}/>}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginTop:8}}>
+          {MONTHS.map((mn,i)=>{
+            const key = `${y}-${String(i+1).padStart(2,"0")}`;
+            const count = shootsPerMonth[key]||0;
+            const isCurMonth = i===td.getMonth() && y===td.getFullYear();
+            return (
+              <button key={i} onClick={()=>{setCur(new Date(y,i,1));setCalView("month");}} style={{
+                padding:"10px 6px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:"inherit",
+                background:isCurMonth?"linear-gradient(135deg,#1d4ed8,#3b82f6)":count>0?"rgba(239,246,255,0.9)":"rgba(248,250,252,0.6)",
+                position:"relative",transition:"all 0.15s"
+              }}>
+                <div style={{fontSize:13,fontWeight:600,color:isCurMonth?"#fff":count>0?"#1d4ed8":"#64748b"}}>{mn}</div>
+                {count>0&&<div style={{fontSize:10,marginTop:2,fontWeight:700,color:isCurMonth?"rgba(255,255,255,0.8)":"#3b82f6"}}>{count} 🎬</div>}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -228,14 +276,31 @@ export default function App() {
   },[]);
 
   useEffect(()=>{
-    const saved=localStorage.getItem("tpv_session");
-    if(saved){ try{ const {user,access_token}=JSON.parse(saved); setUser(user); setAuthToken(access_token); }catch{} }
     const gcal=localStorage.getItem("tpv_gcal"); if(gcal) setGcalToken(gcal);
+    // Handle OAuth redirect
     const hash=window.location.hash;
     if(hash.includes("access_token")){
       const params=new URLSearchParams(hash.replace("#",""));
       const at=params.get("access_token");
-      if(at){ fetch(`${SUPABASE_URL}/auth/v1/user`,{headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${at}`}}).then(r=>r.json()).then(u=>{ setUser(u); setAuthToken(at); localStorage.setItem("tpv_session",JSON.stringify({user:u,access_token:at})); window.history.replaceState({},"",window.location.pathname); }); }
+      const rt=params.get("refresh_token");
+      if(at){ fetch(`${SUPABASE_URL}/auth/v1/user`,{headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${at}`}}).then(r=>r.json()).then(u=>{ setUser(u); setAuthToken(at); localStorage.setItem("tpv_session",JSON.stringify({user:u,access_token:at,refresh_token:rt})); window.history.replaceState({},"",window.location.pathname); }); return; }
+    }
+    // Restore session and auto-refresh
+    const saved=localStorage.getItem("tpv_session");
+    if(saved){
+      try{
+        const {user,access_token,refresh_token}=JSON.parse(saved);
+        // Try to refresh token
+        if(refresh_token){
+          fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`,{method:"POST",headers:{apikey:SUPABASE_KEY,"Content-Type":"application/json"},body:JSON.stringify({refresh_token})})
+            .then(r=>r.json()).then(d=>{
+              if(d.access_token){
+                setUser(d.user||user); setAuthToken(d.access_token);
+                localStorage.setItem("tpv_session",JSON.stringify({user:d.user||user,access_token:d.access_token,refresh_token:d.refresh_token||refresh_token}));
+              } else { setUser(user); setAuthToken(access_token); }
+            }).catch(()=>{ setUser(user); setAuthToken(access_token); });
+        } else { setUser(user); setAuthToken(access_token); }
+      }catch{}
     }
   },[]);
 
@@ -245,7 +310,7 @@ export default function App() {
     setLoading(true);
     try{
       const [s,e]=await Promise.all([sbFetch("shoots?order=date.desc",{},authToken),sbFetch("expenses?order=created_at.desc",{},authToken)]);
-      setShoots((s||[]).map(r=>({id:r.id,date:r.date,clientName:r.client_name,phone:r.phone||"",type:r.type,location:r.location||"",price:r.price,deposit:r.deposit||0,paymentStatus:r.payment_status||"לא שולם",notes:r.notes||"",calendarEventId:r.calendar_event_id,package:r.package||"",drone:r.drone||false,vintage:r.vintage||false})));
+      setShoots((s||[]).map(r=>({id:r.id,date:r.date,clientName:r.client_name,phone:r.phone||"",type:r.type,location:r.location||"",price:r.price,deposit:r.deposit||0,paymentStatus:r.payment_status||"לא שולם",notes:r.notes||"",calendarEventId:r.calendar_event_id})));
       setExpenses((e||[]).map(r=>({id:r.id,month:r.month,description:r.description,amount:r.amount})));
     }catch(err){ console.error('load error',err); }
     setLoading(false);
@@ -300,15 +365,15 @@ export default function App() {
       if(gcalToken){ if(calId) await gcalUpdate({...form,calendarEventId:calId}); else calId=await gcalCreate(form); }
       const updated={...form,id:editId,calendarEventId:calId};
       try{
-        await sbFetch(`shoots?id=eq.${editId}`,{method:"PATCH",body:JSON.stringify({date:form.date,client_name:form.clientName,phone:form.phone,type:form.type,location:form.location,price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,payment_status:form.paymentStatus||"לא שולם",notes:form.notes,calendar_event_id:calId,package:form.package,drone:form.drone,vintage:form.vintage})},authToken);
+        await sbFetch(`shoots?id=eq.${editId}`,{method:"PATCH",body:JSON.stringify({date:form.date,client_name:form.clientName,phone:form.phone,type:form.type,location:form.location,price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,payment_status:form.paymentStatus||"לא שולם",notes:form.notes,calendar_event_id:calId})},authToken);
         setShoots(shoots.map(s=>s.id===editId?updated:s)); showToast("עודכן ✓"); setModal(null); setView("history");
       }catch{ showToast("שגיאה","error"); return; }
       setEditId(null);
     } else {
       let calId=gcalToken?await gcalCreate(form):null;
       try{
-        const res=await sbFetch("shoots",{method:"POST",body:JSON.stringify({date:form.date,client_name:form.clientName,phone:form.phone,type:form.type,location:form.location,price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,payment_status:"לא שולם",notes:form.notes,calendar_event_id:calId,package:form.package,drone:form.drone,vintage:form.vintage})},authToken);
-        setShoots([{id:res[0].id,...form,paymentStatus:"לא שולם",calendarEventId:calId,package:form.package,drone:form.drone,vintage:form.vintage},...shoots]);
+        const res=await sbFetch("shoots",{method:"POST",body:JSON.stringify({date:form.date,client_name:form.clientName,phone:form.phone,type:form.type,location:form.location,price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,payment_status:"לא שולם",notes:form.notes,calendar_event_id:calId})},authToken);
+        setShoots([{id:res[0].id,...form,paymentStatus:"לא שולם",calendarEventId:calId},...shoots]);
         showToast(gcalToken&&calId?"נשמר + לוח שנה ✓":"נשמר ✓"); setModal(null);
       }catch{ showToast("שגיאה","error"); return; }
     }
@@ -396,7 +461,7 @@ export default function App() {
 
   // ── App ────────────────────────────────────────────────────
   return (
-    <div style={S.root}>
+    <div style={S.root} className="app-root">
       <style>{CSS}</style>
       {toast&&<div style={{...S.toast,background:toast.type==="error"?"#ef4444":"#1d4ed8"}}>{toast.msg}</div>}
 
@@ -406,7 +471,7 @@ export default function App() {
       {/* Side Menu */}
       <div style={{...S.sideMenu,transform:menuOpen?"translateX(0)":"translateX(100%)"}}>
         <div style={S.sideHeader}>תפריט</div>
-        {[{label:"דף הבית",v:"home"},{label:"היסטוריה",v:"history"},{label:"כספים",v:"finances"}].map(item=>(
+        {[{label:"דף הבית",v:"home"},{label:"לוח אירועים",v:"history"},{label:"פיננסי",v:"finances"}].map(item=>(
           <button key={item.v} style={{...S.sideItem,color:view===item.v?"#1d4ed8":"#334155",fontWeight:view===item.v?700:500}} onClick={()=>{setView(item.v);setMenuOpen(false);}}>
             {item.label} <span style={S.sideArrow}>{Icon.arrow}</span>
           </button>
@@ -443,14 +508,33 @@ export default function App() {
       </div>
 
       {/* Header */}
-      <header style={S.header}>
+      <header style={S.header} className="app-header">
         <button style={S.headerBtn} onClick={()=>{setSettingsOpen(false);setMenuOpen(o=>!o);}}>{Icon.menu}</button>
         <div style={S.headerLogo}>Tal Porat <span style={{color:"#3b82f6"}}>Video</span></div>
         <button style={S.headerBtn} onClick={()=>{setMenuOpen(false);setSettingsOpen(o=>!o);}}>{Icon.settings}</button>
       </header>
 
+      {/* Desktop Sidebar - hidden on mobile via CSS */}
+      <div className="app-sidebar" style={{display:"none"}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.8,marginBottom:16,paddingRight:16}}>ניווט</div>
+        {[{v:"home",label:"בית",icon:Icon.home},{v:"history",label:"לוח אירועים",icon:Icon.history},{v:"finances",label:"פיננסי",icon:Icon.finance}].map(item=>(
+          <button key={item.v} className={"desktop-nav-item"+(view===item.v?" active":"")} onClick={()=>setView(item.v)}>
+            <span style={{display:"flex",color:view===item.v?"#1d4ed8":"#64748b"}}>{item.icon}</span>
+            {item.label}
+          </button>
+        ))}
+        <button className="desktop-nav-plus press-scale" style={{...S.submitBtn,display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:16}}
+          onClick={()=>{setForm(initialForm);setEditId(null);setModal("new-event");}}>
+          <span style={{display:"flex"}}>{Icon.plus}</span> אירוע חדש
+        </button>
+        <div style={{marginTop:"auto",paddingTop:16,borderTop:"1px solid rgba(219,234,254,0.5)"}}>
+          <div style={{fontSize:12,color:"#94a3b8",marginBottom:4}}>מחובר:</div>
+          <div style={{fontSize:13,fontWeight:600,color:"#334155",wordBreak:"break-all"}}>{user?.email}</div>
+        </div>
+      </div>
+
       {/* Screens */}
-      <div style={{position:"relative",minHeight:"calc(100vh - 56px - 70px)"}}>
+      <div style={{position:"relative",minHeight:"calc(100vh - 56px - 70px)"}} className="app-main-content">
 
         {/* HOME */}
         <Screen visible={view==="home"}>
@@ -540,13 +624,10 @@ export default function App() {
               </div>
             </div>
 
-            <div style={S.glassCard}>
-              <div style={S.cardTitle}>הוסף הוצאה</div>
-              <FormGroup label="חודש"><input type="month" style={S.input} value={expForm.month} onChange={e=>setExpForm({...expForm,month:e.target.value})}/></FormGroup>
-              <FormGroup label="תיאור"><input type="text" placeholder="חיוב אשראי, ציוד..." style={S.input} value={expForm.description} onChange={e=>setExpForm({...expForm,description:e.target.value})}/></FormGroup>
-              <FormGroup label="סכום (₪)"><input type="number" inputMode="numeric" placeholder="0" style={S.input} value={expForm.amount} onChange={e=>setExpForm({...expForm,amount:e.target.value})}/></FormGroup>
-              <button style={S.submitBtn} onClick={handleAddExpense}>הוסף הוצאה</button>
-            </div>
+            <button style={{...S.submitBtn,marginBottom:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8}} onClick={()=>setModal("new-expense")}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              הוסף הוצאה חדשה
+            </button>
 
             {expenses.length>0&&(
               <div style={S.glassCard}>
@@ -567,11 +648,11 @@ export default function App() {
       </div>
 
       {/* Bottom Nav - RTL: בית / היסטוריה / כספים / + */}
-      <nav style={S.bottomNav}>
+      <nav style={S.bottomNav} className="app-bottom-nav">
         {[
           {v:"home",icon:Icon.home,label:"בית"},
-          {v:"history",icon:Icon.history,label:"היסטוריה"},
-          {v:"finances",icon:Icon.finance,label:"כספים"},
+          {v:"history",icon:Icon.history,label:"לוח אירועים"},
+          {v:"finances",icon:Icon.finance,label:"פיננסי"},
         ].map(item=>(
           <button key={item.v} style={{...S.navItem,...(view===item.v?S.navItemActive:{})}} onClick={()=>setView(item.v)}>
             <span style={{color:view===item.v?"#1d4ed8":"#94a3b8",display:"flex"}}>{item.icon}</span>
@@ -604,45 +685,6 @@ export default function App() {
             ))}
           </div>
         </FormGroup>
-        <FormGroup label="חבילה">
-          <div style={{display:"flex",gap:10}}>
-            {["חבילה 1","חבילה 2"].map(p=>(
-              <button key={p} onClick={()=>{
-                const isP2 = p==="חבילה 2";
-                setForm({...form,package:form.package===p?"":p, drone:isP2?true:form.drone, vintage:isP2?true:form.vintage});
-              }} style={{
-                flex:1,padding:"11px 0",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",
-                border:form.package===p?"2px solid #1d4ed8":"1px solid rgba(226,232,240,0.8)",
-                background:form.package===p?"rgba(239,246,255,0.95)":"rgba(248,250,252,0.9)",
-                color:form.package===p?"#1d4ed8":"#64748b",
-                boxShadow:form.package===p?"0 2px 8px rgba(29,78,216,0.15)":"none",
-                transition:"all 0.15s"
-              }}>{p}</button>
-            ))}
-          </div>
-        </FormGroup>
-        <FormGroup label="תוספות">
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {[{key:"drone",label:"צילום רחפן"},{key:"vintage",label:"צילום וינטג׳ בקלטת"}].map(item=>(
-              <button key={item.key} onClick={()=>setForm({...form,[item.key]:!form[item.key]})} style={{
-                display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,
-                background:form[item.key]?"rgba(239,246,255,0.95)":"rgba(248,250,252,0.9)",
-                border:form[item.key]?"1px solid #bfdbfe":"1px solid rgba(226,232,240,0.8)",
-                cursor:"pointer",fontFamily:"inherit",textAlign:"right",width:"100%",transition:"all 0.15s"
-              }}>
-                <div style={{
-                  width:22,height:22,borderRadius:6,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",
-                  background:form[item.key]?"#1d4ed8":"#fff",
-                  border:form[item.key]?"2px solid #1d4ed8":"2px solid #cbd5e1",
-                  transition:"all 0.15s"
-                }}>
-                  {form[item.key]&&<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                </div>
-                <span style={{fontSize:14,fontWeight:600,color:form[item.key]?"#1d4ed8":"#334155"}}>{item.label}</span>
-              </button>
-            ))}
-          </div>
-        </FormGroup>
         <FormGroup label="הערות"><textarea placeholder="פרטים נוספים..." style={{...S.input,minHeight:72,resize:"vertical"}} value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})}/></FormGroup>
         <button style={S.submitBtn} onClick={handleSubmitShoot}>{editId?"עדכן אירוע":"שמור אירוע"}</button>
       </Modal>
@@ -667,6 +709,25 @@ export default function App() {
           </div>
         </div>
         <div style={S.summaryShootCount}>{shoots.filter(s=>s.date?.startsWith(curMonth)).length} צילומים החודש</div>
+      </Modal>
+
+      {/* All Events Modal */}
+      <Modal open={modal==="all-events"} onClose={()=>setModal(null)} title="כל האירועים">
+        {[...shoots].sort((a,b)=>a.date>b.date?1:-1).map(s=>(
+          <div key={s.id} style={{padding:"12px 0",borderBottom:"1px solid rgba(226,232,240,0.6)",cursor:"pointer"}} onClick={()=>{setModal(null);handleEditShoot(s);}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>{s.clientName}</div>
+                <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>{s.date}{s.location?" · "+s.location:""}</div>
+              </div>
+              <div style={{textAlign:"left"}}>
+                <div style={{fontSize:14,fontWeight:800,color:"#0f172a"}}>{fmt(s.price)}</div>
+                <div style={{fontSize:10,marginTop:4,padding:"2px 8px",borderRadius:10,background:s.date>=today()?"rgba(219,234,254,0.7)":"rgba(241,245,249,0.8)",color:s.date>=today()?"#1d4ed8":"#94a3b8",fontWeight:600,textAlign:"center"}}>{s.date>=today()?"עתידי":"עבר"}</div>
+              </div>
+            </div>
+          </div>
+        ))}
+        {shoots.length===0&&<div style={{textAlign:"center",padding:"30px",color:"#94a3b8"}}>אין אירועים</div>}
       </Modal>
 
       {/* Yearly Summary */}
@@ -721,7 +782,7 @@ const S = {
   settingBtnRed:{background:"#fef2f2",color:"#ef4444",border:"1px solid #fecaca",borderRadius:8,padding:"6px 14px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"},
 
   // Bottom nav
-  bottomNav:{position:"fixed",bottom:0,left:0,right:0,background:"rgba(255,255,255,0.95)",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",borderTop:"1px solid rgba(219,234,254,0.6)",display:"flex",alignItems:"center",justifyContent:"space-around",padding:"12px 8px",paddingBottom:"calc(16px + env(safe-area-inset-bottom))",zIndex:40},
+  bottomNav:{position:"fixed",bottom:0,left:0,right:0,background:"rgba(255,255,255,0.97)",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",borderTop:"1px solid rgba(219,234,254,0.6)",display:"flex",alignItems:"center",justifyContent:"space-around",padding:"14px 8px",paddingBottom:"calc(20px + env(safe-area-inset-bottom))",zIndex:40,boxShadow:"0 -4px 20px rgba(15,23,42,0.06)"},
   navItem:{flex:1,background:"transparent",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"4px 0",fontFamily:"inherit",transition:"all 0.15s ease"},
   navItemActive:{},
   navLabel:{fontSize:10,fontWeight:600},
@@ -752,7 +813,7 @@ const S = {
   sectionLink:{background:"transparent",border:"none",color:"#3b82f6",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"},
 
   // Shoot card
-  shootCard:{background:"rgba(255,255,255,0.78)",backdropFilter:"blur(12px)",border:"1px solid rgba(219,234,254,0.6)",borderRadius:18,padding:16,marginBottom:10,cursor:"pointer",transition:"all 0.18s ease"},
+  shootCard:{background:"rgba(255,255,255,0.85)",backdropFilter:"blur(10px)",border:"1px solid rgba(226,232,240,0.5)",borderRadius:16,padding:"14px 16px",marginBottom:8,transition:"all 0.18s ease"},
   shootCardRow:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8},
   shootName:{fontSize:15,fontWeight:700,color:"#0f172a",marginBottom:3},
   shootMeta:{fontSize:12,color:"#94a3b8"},
@@ -827,6 +888,23 @@ const CSS = `
   .press-scale:active { transform: scale(0.95) !important; }
   button { transition: opacity 0.15s ease, transform 0.15s ease; }
   button:active { opacity: 0.8; }
-  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.2); border-radius: 4px; }
+
+  /* ── Desktop layout ── */
+  @media (min-width: 768px) {
+    .app-root { display: grid !important; grid-template-columns: 260px 1fr !important; grid-template-rows: 56px 1fr !important; min-height: 100vh !important; }
+    .app-header { grid-column: 1 / -1 !important; grid-row: 1 !important; }
+    .app-sidebar { grid-column: 1 !important; grid-row: 2 !important; display: flex !important; flex-direction: column !important; background: rgba(255,255,255,0.85) !important; backdrop-filter: blur(20px) !important; border-left: 1px solid rgba(219,234,254,0.6) !important; padding: 24px 16px !important; position: sticky !important; top: 56px !important; height: calc(100vh - 56px) !important; overflow-y: auto !important; }
+    .app-main-content { grid-column: 2 !important; grid-row: 2 !important; padding: 24px 32px !important; max-width: 800px !important; }
+    .app-bottom-nav { display: none !important; }
+    .desktop-nav-item { display: flex !important; align-items: center !important; gap: 12px !important; padding: 12px 16px !important; border-radius: 12px !important; cursor: pointer !important; font-size: 15px !important; font-weight: 600 !important; border: none !important; background: transparent !important; width: 100% !important; text-align: right !important; font-family: inherit !important; color: #334155 !important; transition: all 0.15s !important; margin-bottom: 4px !important; }
+    .desktop-nav-item:hover { background: rgba(239,246,255,0.8) !important; color: #1d4ed8 !important; }
+    .desktop-nav-item.active { background: rgba(239,246,255,0.9) !important; color: #1d4ed8 !important; }
+    .desktop-nav-plus { width: 100% !important; border-radius: 12px !important; margin-top: 8px !important; }
+  }
+  @media (max-width: 767px) {
+    .app-sidebar { display: none !important; }
+    .desktop-nav-item { display: none !important; }
+  }
 `;
