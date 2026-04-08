@@ -1439,6 +1439,9 @@ export default function App() {
         </div>
         <div style={S.summaryShootCount}>{shoots.filter(s=>s.date?.startsWith(curYear)).length} צילומים ב-{curYear}</div>
       </Modal>
+
+      {/* Contract Modal */}
+      <ContractModal open={!!contractShoot} onClose={()=>setContractShoot(null)} shoot={contractShoot}/>
     </div>
   );
 }
@@ -1450,9 +1453,6 @@ function FormGroup({label,children}){
       <label style={{display:"block",fontSize:11,fontWeight:700,color:"#64748b",marginBottom:6,textTransform:"uppercase",letterSpacing:0.5}}>{label}</label>
       {children}
     </div>
-
-      {/* Contract Modal */}
-      <ContractModal open={!!contractShoot} onClose={()=>setContractShoot(null)} shoot={contractShoot}/>
   );
 }
 
