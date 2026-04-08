@@ -1224,19 +1224,23 @@ export default function App() {
           </button>
         ))}
 
-        {/* FAB with expand */}
+        {/* FAB */}
+        {fabOpen&&<div style={{position:"fixed",inset:0,zIndex:39,background:"rgba(15,23,42,0.35)",backdropFilter:"blur(4px)"}} onClick={()=>setFabOpen(false)}/>}
         <div style={{position:"relative"}}>
           {fabOpen&&(
-            <div style={{position:"absolute",bottom:"calc(100% + 12px)",left:"50%",transform:"translateX(-50%)",display:"flex",flexDirection:"column",gap:8,alignItems:"center",zIndex:50}}>
-              <button className="press-scale" onClick={()=>{setFabOpen(false);setModal("new-expense");}} style={{background:"#fff",border:"1px solid rgba(219,234,254,0.8)",borderRadius:14,padding:"10px 16px",fontSize:13,fontWeight:700,color:"#1d4ed8",cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",boxShadow:"0 4px 16px rgba(15,23,42,0.12)",display:"flex",alignItems:"center",gap:8}}>
-                {Icon.expense} הוצאה חדשה
-              </button>
-              <button className="press-scale" onClick={()=>{setFabOpen(false);setForm(initialForm);setEditId(null);setEventType(null);setModal("new-event");}} style={{background:"#fff",border:"1px solid rgba(219,234,254,0.8)",borderRadius:14,padding:"10px 16px",fontSize:13,fontWeight:700,color:"#1d4ed8",cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",boxShadow:"0 4px 16px rgba(15,23,42,0.12)",display:"flex",alignItems:"center",gap:8}}>
-                {Icon.newEvent} אירוע חדש
-              </button>
+            <div style={{position:"absolute",bottom:"calc(100% + 16px)",left:"50%",transform:"translateX(-50%)",display:"flex",flexDirection:"column",gap:10,alignItems:"stretch",zIndex:50,minWidth:200}}>
+              {[
+                {emoji:"🎬",label:"יום צילום חדש",action:()=>{setForm(initialForm);setEditId(null);setEventType("shoot");setModal("new-event");}},
+                {emoji:"🍕",label:"אירוע פיצות חדש",action:()=>{setForm(initialForm);setEditId(null);setEventType("pizza");setModal("new-event");}},
+                {emoji:"💸",label:"הוצאה חדשה",action:()=>setModal("new-expense")},
+              ].map((opt,i)=>(
+                <button key={i} className="press-scale" onClick={()=>{setFabOpen(false);opt.action();}} style={{background:"rgba(255,255,255,0.97)",border:"1px solid rgba(219,234,254,0.9)",borderRadius:16,padding:"13px 18px",fontSize:15,fontWeight:700,color:"#0f172a",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:12,boxShadow:"0 4px 20px rgba(15,23,42,0.13)",whiteSpace:"nowrap"}}>
+                  <span style={{fontSize:22}}>{opt.emoji}</span>
+                  <span>{opt.label}</span>
+                </button>
+              ))}
             </div>
           )}
-          {fabOpen&&<div style={{position:"fixed",inset:0,zIndex:39}} onClick={()=>setFabOpen(false)}/>}
           <button style={{...S.navPlus,transform:fabOpen?"rotate(45deg)":"none",transition:"transform 0.2s ease"}} className="press-scale" onClick={()=>setFabOpen(o=>!o)}>
             {Icon.plus}
           </button>
