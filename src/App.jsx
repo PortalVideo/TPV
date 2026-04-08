@@ -634,6 +634,8 @@ export default function App() {
   const [selectedShoot, setSelectedShoot] = useState(null);
   const [contractShoot, setContractShoot] = useState(null);
   const [histTab, setHistTab] = useState("future");
+  const [fabOpen, setFabOpen] = useState(false);
+  const [confirmDeleteExpenseId, setConfirmDeleteExpenseId] = useState(null);
   const [eventType, setEventType] = useState(null); // "shoot" | "pizza"
   const [pizzaForm, setPizzaForm] = useState({ date:"", clientName:"", phone:"05", price:"", deposit:"", depositPaid:false, fullPaid:false, remind90:false, notes:"" });
   const [searchQuery, setSearchQuery] = useState("");
@@ -1165,10 +1167,7 @@ export default function App() {
                 <div style={S.finLabel}>שולם</div>
                 <div style={{...S.finVal,color:"#1d4ed8"}}>{fmt(paid)}</div>
               </div>
-              <div style={S.finCard}>
-                <div style={S.finLabel}>ממתין</div>
-                <div style={{...S.finVal,color:"#92400e"}}>{fmt(unpaid)}</div>
-              </div>
+
             </div>
 
             <button style={{...S.submitBtn,marginBottom:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8}} onClick={()=>setModal("new-expense")}>
@@ -1184,13 +1183,31 @@ export default function App() {
                     <div><div style={{fontSize:14,fontWeight:600,color:"#1e293b"}}>{e.description}</div><div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>{e.month}</div></div>
                     <div style={{display:"flex",alignItems:"center",gap:10}}>
                       <span style={{fontSize:15,fontWeight:700,color:"#64748b"}}>{fmt(e.amount)}</span>
-                      <button style={S.iconBtn} onClick={()=>handleDeleteExpense(e.id)}>{Icon.close}</button>
+                      <button style={S.iconBtn} onClick={()=>setConfirmDeleteExpenseId(e.id)}>{Icon.close}</button>
                     </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
+
+          {/* Confirm Delete Expense */}
+          {confirmDeleteExpenseId&&(
+            <div style={{position:"fixed",inset:0,zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>setConfirmDeleteExpenseId(null)}>
+              <div style={{position:"absolute",inset:0,background:"rgba(15,23,42,0.5)",backdropFilter:"blur(4px)"}}/>
+              <div style={{position:"relative",background:"#fff",borderRadius:20,padding:28,maxWidth:320,width:"100%",boxShadow:"0 20px 60px rgba(15,23,42,0.2)",textAlign:"center"}} onClick={e=>e.stopPropagation()}>
+                <div style={{width:48,height:48,borderRadius:24,background:"rgba(254,242,242,0.9)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                </div>
+                <div style={{fontSize:17,fontWeight:800,color:"#0f172a",marginBottom:8}}>מחיקת הוצאה</div>
+                <div style={{fontSize:14,color:"#64748b",marginBottom:24}}>האם אתה בטוח שברצונך למחוק את ההוצאה?</div>
+                <div style={{display:"flex",gap:10}}>
+                  <button onClick={()=>setConfirmDeleteExpenseId(null)} style={{flex:1,padding:"12px",borderRadius:12,border:"1px solid rgba(226,232,240,0.8)",background:"rgba(248,250,252,0.9)",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",color:"#64748b"}}>ביטול</button>
+                  <button onClick={()=>{handleDeleteExpense(confirmDeleteExpenseId);setConfirmDeleteExpenseId(null);}} style={{flex:1,padding:"12px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#dc2626,#ef4444)",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",color:"#fff"}}>מחק</button>
+                </div>
+              </div>
+            </div>
+          )}
         </Screen>
       </div>
 
@@ -1207,10 +1224,23 @@ export default function App() {
           </button>
         ))}
 
-        {/* Plus button - far left in RTL */}
-        <button style={S.navPlus} className="press-scale" onClick={()=>{setForm(initialForm);setEditId(null);setEventType(null);setModal("new-event");}}>
-          {Icon.plus}
-        </button>
+        {/* FAB with expand */}
+        <div style={{position:"relative"}}>
+          {fabOpen&&(
+            <div style={{position:"absolute",bottom:"calc(100% + 12px)",left:"50%",transform:"translateX(-50%)",display:"flex",flexDirection:"column",gap:8,alignItems:"center",zIndex:50}}>
+              <button className="press-scale" onClick={()=>{setFabOpen(false);setModal("new-expense");}} style={{background:"#fff",border:"1px solid rgba(219,234,254,0.8)",borderRadius:14,padding:"10px 16px",fontSize:13,fontWeight:700,color:"#1d4ed8",cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",boxShadow:"0 4px 16px rgba(15,23,42,0.12)",display:"flex",alignItems:"center",gap:8}}>
+                {Icon.expense} הוצאה חדשה
+              </button>
+              <button className="press-scale" onClick={()=>{setFabOpen(false);setForm(initialForm);setEditId(null);setEventType(null);setModal("new-event");}} style={{background:"#fff",border:"1px solid rgba(219,234,254,0.8)",borderRadius:14,padding:"10px 16px",fontSize:13,fontWeight:700,color:"#1d4ed8",cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",boxShadow:"0 4px 16px rgba(15,23,42,0.12)",display:"flex",alignItems:"center",gap:8}}>
+                {Icon.newEvent} אירוע חדש
+              </button>
+            </div>
+          )}
+          {fabOpen&&<div style={{position:"fixed",inset:0,zIndex:39}} onClick={()=>setFabOpen(false)}/>}
+          <button style={{...S.navPlus,transform:fabOpen?"rotate(45deg)":"none",transition:"transform 0.2s ease"}} className="press-scale" onClick={()=>setFabOpen(o=>!o)}>
+            {Icon.plus}
+          </button>
+        </div>
       </nav>
 
       {/* ── Modals ── */}
