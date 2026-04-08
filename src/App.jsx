@@ -18,7 +18,17 @@ async function sbFetch(path, options = {}, token) {
   });
   const text = await res.text();
   if (!res.ok) throw new Error(text);
-  return text ? JSON.parse(text) : null;
+  if (!text) return null;
+  const parsed = JSON.parse(text);
+  // Supabase sometimes returns [] for POST even with return=representation — retry with select
+  if (Array.isArray(parsed) && parsed.length === 0 && options.method === "POST") {
+    const sel = await fetch(`${SUPABASE_URL}/rest/v1/${path.split("?")[0]}?order=id.desc&limit=1`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token || SUPABASE_KEY}`, "Content-Type": "application/json" },
+    });
+    const selText = await sel.text();
+    return selText ? JSON.parse(selText) : null;
+  }
+  return parsed;
 }
 
 async function sbAuth(action, body) {
@@ -568,9 +578,11 @@ export default function App() {
       let calId=gcalToken?await gcalCreate(form):null;
       try{
         const res=await sbFetch("shoots",{method:"POST",body:JSON.stringify({date:form.date,client_name:form.clientName,phone:form.phone,type:form.type,location:form.location,price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,payment_status:"לא שולם",notes:form.notes,calendar_event_id:calId,package:form.package,drone:form.drone,vintage:form.vintage,deposit_paid:form.depositPaid||false,full_paid:form.fullPaid||false,production_status:"",remind90:form.remind90||false})},authToken);
-        setShoots([{id:res[0].id,...form,paymentStatus:"לא שולם",calendarEventId:calId,depositPaid:form.depositPaid||false,fullPaid:form.fullPaid||false},...shoots]);
+        const newId=res?.[0]?.id??null;
+        const newShoot={id:newId,date:form.date,clientName:form.clientName,phone:form.phone||"",type:form.type,location:form.location||"",price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,paymentStatus:"לא שולם",notes:form.notes||"",calendarEventId:calId,package:form.package||"",drone:form.drone||false,vintage:form.vintage||false,depositPaid:form.depositPaid||false,fullPaid:form.fullPaid||false,productionStatus:"",remind90:form.remind90||false};
+        setShoots([newShoot,...shoots]);
         showToast(gcalToken&&calId?"נשמר + לוח שנה ✓":"נשמר ✓"); setModal(null);
-      }catch{ showToast("שגיאה","error"); return; }
+      }catch(err){ console.error("shoot save error",err); showToast("שגיאה: "+(err?.message||""),"error"); return; }
     }
     setForm(initialForm);
   }
