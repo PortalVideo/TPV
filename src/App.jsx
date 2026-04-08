@@ -221,30 +221,41 @@ function PayBadge({ shoot, onUpdate }) {
 
 // ── Shoot Card ─────────────────────────────────────────────────
 // ── Minimal Home Card (read-only) ─────────────────────────────
-function HomeCard({ shoot }) {
+function HomeCard({ shoot, isPast }) {
   const isFuture = shoot.date >= today();
   const daysSince = shoot.date ? Math.floor((new Date()-new Date(shoot.date))/(1000*60*60*24)) : 0;
+  const daysUntil = shoot.date ? Math.ceil((new Date(shoot.date+"T12:00:00") - new Date()) / (1000*60*60*24)) : 0;
   const daysLeft = 90 - daysSince;
-  const showDeadline = !isFuture && shoot.productionStatus !== "סגור" && daysSince <= 100;
-  const deadlineUrgent = daysLeft <= 14 && daysLeft > 0;
   const deadlinePassed = daysLeft <= 0;
+  const deadlineUrgent = daysLeft <= 14 && daysLeft > 0;
+  const dateObj = shoot.date ? new Date(shoot.date+"T12:00:00") : null;
+  const DAYS_HE = ["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"];
+  const MONTHS_HE = ["ינו׳","פבר׳","מרץ","אפר׳","מאי","יוני","יולי","אוג׳","ספט׳","אוק׳","נוב׳","דצמ׳"];
+  const dayName = dateObj ? DAYS_HE[dateObj.getDay()] : "";
   return (
-    <div style={{...S.shootCard,padding:"12px 14px",marginBottom:8}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-        <div style={{flex:1}}>
-          <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>{shoot.clientName}</div>
-          <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>
-            {shoot.date}{shoot.location?" · "+shoot.location:""}
-          </div>
+    <div style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",background:"rgba(255,255,255,0.82)",backdropFilter:"blur(12px)",border:"1px solid rgba(219,234,254,0.7)",borderRadius:16,marginBottom:8,boxShadow:"0 2px 8px rgba(15,23,42,0.05)"}}>
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minWidth:44,height:50,background:isFuture?"linear-gradient(135deg,#1d4ed8,#3b82f6)":"rgba(241,245,249,0.9)",borderRadius:12,flexShrink:0}}>
+        <span style={{fontSize:19,fontWeight:900,color:isFuture?"#fff":"#334155",lineHeight:1}}>{dateObj?dateObj.getDate():"?"}</span>
+        <span style={{fontSize:9,fontWeight:700,color:isFuture?"rgba(255,255,255,0.75)":"#94a3b8",marginTop:1,letterSpacing:0.3}}>{dateObj?MONTHS_HE[dateObj.getMonth()]:""}</span>
+      </div>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:15,fontWeight:700,color:"#0f172a",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{shoot.clientName}</div>
+        <div style={{fontSize:12,color:"#64748b",marginTop:3,display:"flex",alignItems:"center",gap:5}}>
+          <span>יום {dayName}{dateObj?", "+String(dateObj.getDate()).padStart(2,"0")+"."+String(dateObj.getMonth()+1).padStart(2,"0"):""}</span>
+          {shoot.location&&<><span style={{color:"#e2e8f0"}}>·</span><span style={{whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:110}}>{shoot.location}</span></>}
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
-          {showDeadline&&(
-            <span style={{fontSize:10,padding:"2px 7px",borderRadius:10,background:deadlinePassed?"rgba(254,242,242,0.9)":deadlineUrgent?"rgba(255,247,237,0.9)":"rgba(241,245,249,0.8)",color:deadlinePassed?"#dc2626":deadlineUrgent?"#c2410c":"#64748b",fontWeight:700}}>
-              {deadlinePassed?`פג! +${Math.abs(daysLeft)}י`:`${daysLeft}י`}
-            </span>
-          )}
-          <div style={{fontSize:10,padding:"3px 8px",borderRadius:12,background:isFuture?"rgba(239,246,255,0.9)":"rgba(241,245,249,0.8)",color:isFuture?"#1d4ed8":"#94a3b8",fontWeight:600}}>{isFuture?"קרוב":"עבר"}</div>
-        </div>
+      </div>
+      <div style={{flexShrink:0}}>
+        {isFuture&&(
+          <span style={{fontSize:11,fontWeight:700,padding:"4px 9px",borderRadius:20,background:daysUntil<=0?"linear-gradient(135deg,#1d4ed8,#3b82f6)":daysUntil<=3?"rgba(239,246,255,0.95)":daysUntil<=7?"rgba(241,245,249,0.95)":"rgba(248,250,252,0.9)",color:daysUntil<=0?"#fff":daysUntil<=3?"#1d4ed8":daysUntil<=7?"#3b82f6":"#94a3b8",boxShadow:daysUntil<=0?"0 2px 8px rgba(29,78,216,0.3)":"none"}}>
+            {daysUntil<=0?"היום!":daysUntil===1?"מחר":`${daysUntil} ימים`}
+          </span>
+        )}
+        {isPast&&shoot.productionStatus&&shoot.productionStatus!=="סגור"&&(
+          <span style={{fontSize:11,fontWeight:700,padding:"4px 9px",borderRadius:20,background:deadlinePassed?"rgba(254,242,242,0.9)":deadlineUrgent?"rgba(255,247,237,0.9)":"rgba(241,245,249,0.8)",color:deadlinePassed?"#dc2626":deadlineUrgent?"#c2410c":"#64748b"}}>
+            {deadlinePassed?"פג":`${daysLeft}י׳`}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -305,7 +316,7 @@ function ShootCard({ shoot, onEdit, onDelete, onUpdatePayment, onUpdateProductio
         <div style={{flex:1}}>
           <div style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>{shoot.clientName}</div>
           <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>
-            {shoot.date}{shoot.location?" · "+shoot.location:""}
+            {shoot.date?shoot.date.split("-").reverse().join("."):""}{shoot.location?" · "+shoot.location:""}
           </div>
         </div>
         {/* Package + production + deadline badges always visible */}
@@ -787,43 +798,42 @@ export default function App() {
           <div style={S.main}>
             <div style={S.greeting}>היי {firstName} 👋</div>
 
-            {/* Quick Actions */}
-            <div style={S.quickGrid}>
-              {[
-                {icon:Icon.newEvent, label:"אירוע חדש", action:()=>{setForm(initialForm);setEditId(null);setEventType(null);setModal("new-event");}},
-                {icon:Icon.expense, label:"הוצאה חדשה", action:()=>setModal("new-expense")},
-                {icon:Icon.chart, label:"סיכום חודשי", action:()=>setModal("monthly")},
-                {icon:Icon.yearly, label:"סיכום שנתי", action:()=>setModal("yearly")},
-              ].map((q,i)=>(
-                <button key={i} style={S.quickBtn} onClick={q.action} className="press-scale">
-                  <span style={{color:"#1d4ed8"}}>{q.icon}</span>
-                  <span style={S.quickLabel}>{q.label}</span>
-                </button>
-              ))}
+            {/* 2 Action Buttons */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
+              <button className="press-scale" onClick={()=>{setForm(initialForm);setEditId(null);setEventType("shoot");setModal("new-event");}} style={{background:"linear-gradient(135deg,#1d4ed8,#3b82f6)",border:"none",borderRadius:16,padding:"16px 10px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:"inherit",boxShadow:"0 4px 16px rgba(29,78,216,0.25)"}}>
+                <span style={{fontSize:26}}>🎬</span>
+                <span style={{fontSize:14,fontWeight:700,color:"#fff"}}>צילום חדש</span>
+              </button>
+              <button className="press-scale" onClick={()=>{setForm(initialForm);setEditId(null);setEventType("pizza");setModal("new-event");}} style={{background:"rgba(255,255,255,0.85)",backdropFilter:"blur(12px)",border:"1px solid rgba(219,234,254,0.7)",borderRadius:16,padding:"16px 10px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:"inherit",boxShadow:"0 2px 8px rgba(15,23,42,0.06)"}}>
+                <span style={{fontSize:26}}>🍕</span>
+                <span style={{fontSize:14,fontWeight:700,color:"#1d4ed8"}}>פיצה חדשה</span>
+              </button>
             </div>
 
-            {/* Future shoots - minimal */}
+            {/* Upcoming shoots */}
             <div style={S.sectionHeader}>
               <span style={S.sectionTitle}>אירועים קרובים</span>
               <button style={S.sectionLink} onClick={()=>setView("history")}>הכל</button>
             </div>
             {futureShoot.length===0 ? (
               <div style={S.emptyCard}><div style={S.emptyIcon}>{Icon.calendar}</div><div style={S.emptyText}>אין אירועים קרובים</div></div>
-            ) : futureShoot.slice(0,3).map(s=><HomeCard key={s.id} shoot={s}/>)}
+            ) : futureShoot.slice(0,3).map(s=><HomeCard key={s.id} shoot={s} isPast={false}/>)}
 
-            {/* Calendar */}
-            <MiniCalendar shoots={shoots}/>
-
-            {/* Past shoots - minimal */}
+            {/* Past shoots */}
             {pastShoots.length>0&&(
               <>
-                <div style={S.sectionHeader}>
-                  <span style={S.sectionTitle}>אירועים קודמים</span>
+                <div style={{...S.sectionHeader,marginTop:8}}>
+                  <span style={S.sectionTitle}>אירועים שהיו</span>
                   <button style={S.sectionLink} onClick={()=>setView("history")}>הכל</button>
                 </div>
-                {pastShoots.slice(0,3).map(s=><HomeCard key={s.id} shoot={s}/>)}
+                {pastShoots.slice(0,3).map(s=><HomeCard key={s.id} shoot={s} isPast={true}/>)}
               </>
             )}
+
+            {/* Calendar */}
+            <div style={{marginTop:8}}>
+              <MiniCalendar shoots={shoots}/>
+            </div>
 
             {/* Deadline alerts */}
             {(()=>{
