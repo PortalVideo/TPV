@@ -934,7 +934,9 @@ export default function App() {
   },0);
   const totalExpected = shoots.reduce((s,r)=>s+(parseFloat(r.price)||0),0);
   const totalExp = expenses.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
-  const net = totalIncome - totalExp;
+  const VAT = 0.18;
+  const totalIncomeNet = totalIncome * (1 - VAT);
+  const net = totalIncomeNet - totalExp;
   const paid = shoots.filter(s=>s.fullPaid).reduce((s,r)=>s+(parseFloat(r.price)||0),0);
   const unpaid = totalExpected - paid;
   const rawName = user?.user_metadata?.full_name?.split(" ")[0] || user?.email?.split("@")[0] || "טל";
@@ -943,11 +945,13 @@ export default function App() {
   // Monthly summary
   const curMonth = getCurrentMonth();
   const monthlyIncome = shoots.filter(s=>s.date?.startsWith(curMonth)).reduce((s,r)=>s+(parseFloat(r.price)||0),0);
+  const monthlyIncomeNet = monthlyIncome * (1 - VAT);
   const monthlyExp = expenses.filter(e=>e.month===curMonth).reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
 
   // Yearly summary
   const curYear = new Date().getFullYear().toString();
   const yearlyIncome = shoots.filter(s=>s.date?.startsWith(curYear)).reduce((s,r)=>s+(parseFloat(r.price)||0),0);
+  const yearlyIncomeNet = yearlyIncome * (1 - VAT);
   const yearlyExp = expenses.filter(e=>e.month?.startsWith(curYear)).reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
 
   // ── Biometric Lock Screen ─────────────────────────────────
@@ -1204,12 +1208,13 @@ export default function App() {
             <div style={S.pageTitle}>כספים</div>
             <div style={S.finGrid}>
               <div style={{...S.finCard,gridColumn:"span 2",background:"linear-gradient(135deg,#1d4ed8,#2563eb)",border:"none"}}>
-                <div style={{...S.finLabel,color:"rgba(255,255,255,0.7)"}}>סה"כ הכנסות ברוטו</div>
-                <div style={{...S.finVal,fontSize:26,color:"#fff"}}>{fmt(totalIncome)}</div>
+                <div style={{...S.finLabel,color:"rgba(255,255,255,0.7)"}}>הכנסות ברוטו</div>
+                <div style={{...S.finVal,fontSize:22,color:"#fff"}}>{fmt(totalIncome)}</div>
+                <div style={{fontSize:12,color:"rgba(255,255,255,0.7)",marginTop:4}}>נטו (אחרי מע"מ 18%): <strong style={{color:"#fff"}}>{fmt(totalIncomeNet)}</strong></div>
                 <div style={{fontSize:12,color:"rgba(255,255,255,0.6)",marginTop:4}}>{shoots.length} ימי צילום</div>
               </div>
               <div style={S.finCard}>
-                <div style={S.finLabel}>נטו</div>
+                <div style={S.finLabel}>נטו אחרי מע"מ והוצאות</div>
                 <div style={{...S.finVal,color:net>=0?"#1d4ed8":"#ef4444"}}>{fmt(net)}</div>
               </div>
               <div style={S.finCard}>
@@ -1500,11 +1505,11 @@ export default function App() {
       <Modal open={modal==="monthly"} onClose={()=>setModal(null)} title="סיכום חודשי">
         <div style={S.summaryMonth}>{new Date().toLocaleDateString("he-IL",{month:"long",year:"numeric"})}</div>
         <div style={S.summaryGrid}>
-          <div style={S.summaryCard}><div style={S.summaryLabel}>הכנסות</div><div style={{...S.summaryVal,color:"#1d4ed8"}}>{fmt(monthlyIncome)}</div></div>
+          <div style={S.summaryCard}><div style={S.summaryLabel}>ברוטו</div><div style={{...S.summaryVal,color:"#1d4ed8"}}>{fmt(monthlyIncome)}</div><div style={{fontSize:11,color:"#94a3b8",marginTop:3}}>נטו: {fmt(monthlyIncomeNet)}</div></div>
           <div style={S.summaryCard}><div style={S.summaryLabel}>הוצאות</div><div style={{...S.summaryVal,color:"#64748b"}}>{fmt(monthlyExp)}</div></div>
           <div style={{...S.summaryCard,gridColumn:"span 2",background:"linear-gradient(135deg,#eff6ff,#dbeafe)"}}>
             <div style={S.summaryLabel}>נטו</div>
-            <div style={{...S.summaryVal,fontSize:24,color:monthlyIncome-monthlyExp>=0?"#1d4ed8":"#ef4444"}}>{fmt(monthlyIncome-monthlyExp)}</div>
+            <div style={{...S.summaryVal,fontSize:24,color:monthlyIncomeNet-monthlyExp>=0?"#1d4ed8":"#ef4444"}}>{fmt(monthlyIncomeNet-monthlyExp)}</div>
           </div>
         </div>
         <div style={S.summaryShootCount}>{shoots.filter(s=>s.date?.startsWith(curMonth)).length} צילומים החודש</div>
@@ -1533,11 +1538,11 @@ export default function App() {
       <Modal open={modal==="yearly"} onClose={()=>setModal(null)} title="סיכום שנתי">
         <div style={S.summaryMonth}>{curYear}</div>
         <div style={S.summaryGrid}>
-          <div style={S.summaryCard}><div style={S.summaryLabel}>הכנסות</div><div style={{...S.summaryVal,color:"#1d4ed8"}}>{fmt(yearlyIncome)}</div></div>
+          <div style={S.summaryCard}><div style={S.summaryLabel}>ברוטו</div><div style={{...S.summaryVal,color:"#1d4ed8"}}>{fmt(yearlyIncome)}</div><div style={{fontSize:11,color:"#94a3b8",marginTop:3}}>נטו: {fmt(yearlyIncomeNet)}</div></div>
           <div style={S.summaryCard}><div style={S.summaryLabel}>הוצאות</div><div style={{...S.summaryVal,color:"#64748b"}}>{fmt(yearlyExp)}</div></div>
           <div style={{...S.summaryCard,gridColumn:"span 2",background:"linear-gradient(135deg,#eff6ff,#dbeafe)"}}>
             <div style={S.summaryLabel}>נטו שנתי</div>
-            <div style={{...S.summaryVal,fontSize:24,color:yearlyIncome-yearlyExp>=0?"#1d4ed8":"#ef4444"}}>{fmt(yearlyIncome-yearlyExp)}</div>
+            <div style={{...S.summaryVal,fontSize:24,color:yearlyIncomeNet-yearlyExp>=0?"#1d4ed8":"#ef4444"}}>{fmt(yearlyIncomeNet-yearlyExp)}</div>
           </div>
         </div>
         <div style={S.summaryShootCount}>{shoots.filter(s=>s.date?.startsWith(curYear)).length} צילומים ב-{curYear}</div>
