@@ -221,7 +221,7 @@ function PayBadge({ shoot, onUpdate }) {
 
 // ── Shoot Card ─────────────────────────────────────────────────
 // ── Minimal Home Card (read-only) ─────────────────────────────
-function HomeCard({ shoot, isPast }) {
+function HomeCard({ shoot, isPast, onOpen }) {
   const isFuture = shoot.date >= today();
   const daysSince = shoot.date ? Math.floor((new Date()-new Date(shoot.date))/(1000*60*60*24)) : 0;
   const daysUntil = shoot.date ? Math.ceil((new Date(shoot.date+"T12:00:00") - new Date()) / (1000*60*60*24)) : 0;
@@ -233,7 +233,7 @@ function HomeCard({ shoot, isPast }) {
   const MONTHS_HE = ["ינו׳","פבר׳","מרץ","אפר׳","מאי","יוני","יולי","אוג׳","ספט׳","אוק׳","נוב׳","דצמ׳"];
   const dayName = dateObj ? DAYS_HE[dateObj.getDay()] : "";
   return (
-    <div style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",background:"rgba(255,255,255,0.82)",backdropFilter:"blur(12px)",border:"1px solid rgba(219,234,254,0.7)",borderRadius:16,marginBottom:8,boxShadow:"0 2px 8px rgba(15,23,42,0.05)"}}>
+    <div onClick={onOpen} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",background:"rgba(255,255,255,0.82)",backdropFilter:"blur(12px)",border:"1px solid rgba(219,234,254,0.7)",borderRadius:16,marginBottom:8,boxShadow:"0 2px 8px rgba(15,23,42,0.05)",cursor:onOpen?"pointer":"default"}}>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minWidth:44,height:50,background:isFuture?"linear-gradient(135deg,#1d4ed8,#3b82f6)":"rgba(241,245,249,0.9)",borderRadius:12,flexShrink:0}}>
         <span style={{fontSize:19,fontWeight:900,color:isFuture?"#fff":"#334155",lineHeight:1}}>{dateObj?dateObj.getDate():"?"}</span>
         <span style={{fontSize:9,fontWeight:700,color:isFuture?"rgba(255,255,255,0.75)":"#94a3b8",marginTop:1,letterSpacing:0.3}}>{dateObj?MONTHS_HE[dateObj.getMonth()]:""}</span>
@@ -425,6 +425,7 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [modal, setModal] = useState(null);
+  const [selectedShoot, setSelectedShoot] = useState(null);
   const [eventType, setEventType] = useState(null); // "shoot" | "pizza"
   const [pizzaForm, setPizzaForm] = useState({ date:"", clientName:"", phone:"05", price:"", deposit:"", depositPaid:false, fullPaid:false, remind90:false, notes:"" });
   const [searchQuery, setSearchQuery] = useState("");
@@ -800,14 +801,15 @@ export default function App() {
 
             {/* 2 Action Buttons */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
-              <button className="press-scale" onClick={()=>{setForm(initialForm);setEditId(null);setEventType("shoot");setModal("new-event");}} style={{background:"linear-gradient(135deg,#1d4ed8,#3b82f6)",border:"none",borderRadius:16,padding:"16px 10px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:"inherit",boxShadow:"0 4px 16px rgba(29,78,216,0.25)"}}>
-                <span style={{fontSize:26}}>🎬</span>
-                <span style={{fontSize:14,fontWeight:700,color:"#fff"}}>צילום חדש</span>
-              </button>
-              <button className="press-scale" onClick={()=>{setForm(initialForm);setEditId(null);setEventType("pizza");setModal("new-event");}} style={{background:"rgba(255,255,255,0.85)",backdropFilter:"blur(12px)",border:"1px solid rgba(219,234,254,0.7)",borderRadius:16,padding:"16px 10px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:"inherit",boxShadow:"0 2px 8px rgba(15,23,42,0.06)"}}>
-                <span style={{fontSize:26}}>🍕</span>
-                <span style={{fontSize:14,fontWeight:700,color:"#1d4ed8"}}>פיצה חדשה</span>
-              </button>
+              {[
+                {emoji:"🎬",label:"יום צילום חדש",type:"shoot"},
+                {emoji:"🍕",label:"אירוע פיצות חדש",type:"pizza"},
+              ].map(btn=>(
+                <button key={btn.type} className="press-scale" onClick={()=>{setForm(initialForm);setEditId(null);setEventType(btn.type);setModal("new-event");}} style={{background:"rgba(255,255,255,0.85)",backdropFilter:"blur(12px)",border:"1px solid rgba(219,234,254,0.7)",borderRadius:16,padding:"16px 10px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,fontFamily:"inherit",boxShadow:"0 2px 8px rgba(15,23,42,0.06)"}}>
+                  <span style={{fontSize:26}}>{btn.emoji}</span>
+                  <span style={{fontSize:13,fontWeight:700,color:"#1d4ed8",textAlign:"center"}}>{btn.label}</span>
+                </button>
+              ))}
             </div>
 
             {/* Upcoming shoots */}
@@ -817,7 +819,7 @@ export default function App() {
             </div>
             {futureShoot.length===0 ? (
               <div style={S.emptyCard}><div style={S.emptyIcon}>{Icon.calendar}</div><div style={S.emptyText}>אין אירועים קרובים</div></div>
-            ) : futureShoot.slice(0,3).map(s=><HomeCard key={s.id} shoot={s} isPast={false}/>)}
+            ) : futureShoot.slice(0,3).map(s=><HomeCard key={s.id} shoot={s} isPast={false} onOpen={()=>{setSelectedShoot(s);setModal("shoot-detail");}}/>)}
 
             {/* Past shoots */}
             {pastShoots.length>0&&(
@@ -826,7 +828,7 @@ export default function App() {
                   <span style={S.sectionTitle}>אירועים שהיו</span>
                   <button style={S.sectionLink} onClick={()=>setView("history")}>הכל</button>
                 </div>
-                {pastShoots.slice(0,3).map(s=><HomeCard key={s.id} shoot={s} isPast={true}/>)}
+                {pastShoots.slice(0,1).map(s=><HomeCard key={s.id} shoot={s} isPast={true} onOpen={()=>{setSelectedShoot(s);setModal("shoot-detail");}}/>)}
               </>
             )}
 
@@ -1109,6 +1111,69 @@ export default function App() {
       </Modal>
 
       {/* New Expense */}
+      {/* Shoot Detail Modal */}
+      {selectedShoot&&(
+        <Modal open={modal==="shoot-detail"} onClose={()=>{setModal(null);setSelectedShoot(null);}} title="פרטי אירוע">
+          {(()=>{
+            const s = selectedShoot;
+            const dateObj = s.date ? new Date(s.date+"T12:00:00") : null;
+            const DAYS_HE = ["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"];
+            const MONTHS_HE = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
+            const dateLabel = dateObj ? `יום ${DAYS_HE[dateObj.getDay()]}, ${dateObj.getDate()} ${MONTHS_HE[dateObj.getMonth()]} ${dateObj.getFullYear()}` : s.date;
+            const total = parseFloat(s.price)||0;
+            const dep = parseFloat(s.deposit)||0;
+            const rem = total - dep;
+            const PROD_CFG = {"צולם":{bg:"rgba(239,246,255,0.9)",color:"#1d4ed8"},"בעריכה":{bg:"rgba(254,249,195,0.8)",color:"#854d0e"},"נשלח ללקוח":{bg:"rgba(220,252,231,0.8)",color:"#166534"},"סגור":{bg:"rgba(241,245,249,0.8)",color:"#64748b"}};
+            return (
+              <div>
+                {/* Header info */}
+                <div style={{background:"rgba(239,246,255,0.6)",borderRadius:14,padding:"14px 16px",marginBottom:14}}>
+                  <div style={{fontSize:20,fontWeight:800,color:"#0f172a",marginBottom:4}}>{s.clientName}</div>
+                  <div style={{fontSize:13,color:"#64748b"}}>{dateLabel}</div>
+                  {s.location&&<div style={{fontSize:13,color:"#64748b",marginTop:2}}>📍 {s.location}</div>}
+                  {s.phone&&<div style={{fontSize:13,color:"#64748b",marginTop:2}}>📞 {s.phone}</div>}
+                </div>
+                {/* Tags */}
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+                  <span style={{fontSize:11,padding:"4px 10px",borderRadius:20,background:"rgba(219,234,254,0.7)",color:"#1e40af",fontWeight:600}}>{s.type}</span>
+                  {s.drone&&<span style={{fontSize:11,padding:"4px 10px",borderRadius:20,background:"rgba(240,249,255,0.8)",color:"#0369a1",fontWeight:600}}>🚁 רחפן</span>}
+                  {s.vintage&&<span style={{fontSize:11,padding:"4px 10px",borderRadius:20,background:"rgba(254,249,240,0.8)",color:"#92400e",fontWeight:600}}>📼 וינטג׳</span>}
+                  {s.package&&<span style={{fontSize:11,padding:"4px 10px",borderRadius:20,background:"rgba(219,234,254,0.7)",color:"#1e40af",fontWeight:600}}>{s.package}</span>}
+                  {s.productionStatus&&<span style={{fontSize:11,padding:"4px 10px",borderRadius:20,background:(PROD_CFG[s.productionStatus]||{bg:"rgba(241,245,249,0.8)"}).bg,color:(PROD_CFG[s.productionStatus]||{color:"#64748b"}).color,fontWeight:600}}>{s.productionStatus}</span>}
+                </div>
+                {/* Finance */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
+                  <div style={{background:"rgba(248,250,252,0.9)",borderRadius:12,padding:"10px 8px",textAlign:"center"}}>
+                    <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:4}}>סכום</div>
+                    <div style={{fontSize:15,fontWeight:800,color:"#0f172a"}}>{fmt(total)}</div>
+                  </div>
+                  <div style={{background:"rgba(248,250,252,0.9)",borderRadius:12,padding:"10px 8px",textAlign:"center"}}>
+                    <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:4}}>מקדמה</div>
+                    <div style={{fontSize:15,fontWeight:800,color:"#1d4ed8"}}>{fmt(dep)}</div>
+                  </div>
+                  <div style={{background:"rgba(248,250,252,0.9)",borderRadius:12,padding:"10px 8px",textAlign:"center"}}>
+                    <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:4}}>יתרה</div>
+                    <div style={{fontSize:15,fontWeight:800,color:"#0369a1"}}>{fmt(rem)}</div>
+                  </div>
+                </div>
+                {/* Payment status */}
+                <div style={{display:"flex",gap:8,marginBottom:14}}>
+                  {s.depositPaid&&<span style={{fontSize:12,padding:"4px 10px",borderRadius:20,background:"rgba(254,249,195,0.8)",color:"#854d0e",fontWeight:700}}>✓ מקדמה שולמה</span>}
+                  {s.fullPaid&&<span style={{fontSize:12,padding:"4px 10px",borderRadius:20,background:"rgba(220,252,231,0.8)",color:"#166534",fontWeight:700}}>✓ שולם במלואו</span>}
+                </div>
+                {s.notes&&<div style={{fontSize:13,color:"#64748b",background:"rgba(248,250,252,0.9)",borderRadius:10,padding:"10px 12px",marginBottom:14}}>{s.notes}</div>}
+                {/* Action buttons */}
+                <div style={{display:"flex",gap:8}}>
+                  {s.phone&&<button onClick={()=>window.open("tel:"+s.phone)} style={{flex:1,background:"rgba(239,246,255,0.9)",border:"1px solid rgba(191,219,254,0.6)",borderRadius:12,padding:"10px",fontSize:13,fontWeight:600,color:"#1d4ed8",cursor:"pointer",fontFamily:"inherit"}}>📞 חייג</button>}
+                  {s.phone&&<button onClick={()=>{const p=(s.phone||"").replace(/[^0-9]/g,"");const m=encodeURIComponent("היי "+s.clientName+"!");window.open("https://wa.me/972"+p.replace(/^0/,"")+"?text="+m);}} style={{flex:1,background:"rgba(220,252,231,0.8)",border:"1px solid rgba(134,239,172,0.4)",borderRadius:12,padding:"10px",fontSize:13,fontWeight:600,color:"#166534",cursor:"pointer",fontFamily:"inherit"}}>💬 WhatsApp</button>}
+                  <button onClick={()=>{setModal(null);setSelectedShoot(null);handleEditShoot(s);}} style={{flex:1,background:"rgba(239,246,255,0.9)",border:"1px solid rgba(191,219,254,0.6)",borderRadius:12,padding:"10px",fontSize:13,fontWeight:600,color:"#1d4ed8",cursor:"pointer",fontFamily:"inherit"}}>✏️ ערוך</button>
+                </div>
+              </div>
+            );
+          })()}
+        </Modal>
+      )}
+
       <Modal open={modal==="new-expense"} onClose={()=>setModal(null)} title="הוצאה חדשה">
         <FormGroup label="חודש"><input type="month" style={S.input} value={expForm.month} onChange={e=>setExpForm({...expForm,month:e.target.value})}/></FormGroup>
         <FormGroup label="תיאור"><input type="text" placeholder="חיוב אשראי, ציוד..." style={S.input} value={expForm.description} onChange={e=>setExpForm({...expForm,description:e.target.value})}/></FormGroup>
