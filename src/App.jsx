@@ -426,6 +426,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [modal, setModal] = useState(null);
   const [selectedShoot, setSelectedShoot] = useState(null);
+  const [histTab, setHistTab] = useState("future");
   const [eventType, setEventType] = useState(null); // "shoot" | "pizza"
   const [pizzaForm, setPizzaForm] = useState({ date:"", clientName:"", phone:"05", price:"", deposit:"", depositPaid:false, fullPaid:false, remind90:false, notes:"" });
   const [searchQuery, setSearchQuery] = useState("");
@@ -890,15 +891,15 @@ export default function App() {
                 <>
                   <div style={{display:"flex",background:"rgba(241,245,249,0.8)",borderRadius:12,padding:4,marginBottom:14,gap:4}}>
                     {[{id:"future",label:`עתידיים (${filtFuture.length})`},{id:"past",label:`עבר (${filtPast.length})`}].map(tab=>(
-                      <button key={tab.id} onClick={()=>setFilterType(prev=>{ window._histTab=tab.id; return prev; })||( window._histTab=tab.id)||setSearchQuery(q=>q)} style={{flex:1,padding:"9px",borderRadius:9,border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:700,background:(!window._histTab&&tab.id==="future")||(window._histTab===tab.id)?"#fff":"transparent",color:(!window._histTab&&tab.id==="future")||(window._histTab===tab.id)?"#1d4ed8":"#64748b",boxShadow:(!window._histTab&&tab.id==="future")||(window._histTab===tab.id)?"0 1px 4px rgba(15,23,42,0.08)":"none",transition:"all 0.15s"}}>
+                      <button key={tab.id} onClick={()=>setHistTab(tab.id)} style={{flex:1,padding:"9px",borderRadius:9,border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:700,background:histTab===tab.id?"#fff":"transparent",color:histTab===tab.id?"#1d4ed8":"#64748b",boxShadow:histTab===tab.id?"0 1px 4px rgba(15,23,42,0.08)":"none",transition:"all 0.15s"}}>
                         {tab.label}
                       </button>
                     ))}
                   </div>
                   {loading ? <div style={S.loading}>טוען...</div> :
-                   ((!window._histTab||window._histTab==="future") ? filtFuture : filtPast).length===0 ?
+                   (histTab==="future" ? filtFuture : filtPast).length===0 ?
                    <div style={S.emptyCard}><div style={S.emptyIcon}>{Icon.history}</div><div style={S.emptyText}>אין אירועים</div></div> :
-                   ((!window._histTab||window._histTab==="future") ? filtFuture : filtPast).map(s=>(
+                   (histTab==="future" ? filtFuture : filtPast).map(s=>(
                      <ShootCard key={s.id} shoot={s} animate={mounted} onEdit={handleEditShoot} onDelete={handleDeleteShoot} onUpdatePayment={handleUpdatePayment} onUpdateProduction={handleUpdateProductionStatus}/>
                    ))
                   }
