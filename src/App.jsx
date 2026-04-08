@@ -735,7 +735,7 @@ export default function App() {
     setLoading(true);
     try{
       const [s,e]=await Promise.all([sbFetch("shoots?order=date.desc&user_id=eq."+user?.id,{},authToken),sbFetch("expenses?order=created_at.desc&user_id=eq."+user?.id,{},authToken)]);
-      setShoots((s||[]).map(r=>({id:r.id,date:r.date,clientName:r.client_name,phone:r.phone||"",type:r.type,location:r.location||"",price:r.price,deposit:r.deposit||0,paymentStatus:r.payment_status||"לא שולם",notes:r.notes||"",calendarEventId:r.calendar_event_id,package:r.package||"",drone:r.drone||false,vintage:r.vintage||false,depositPaid:r.deposit_paid||false,fullPaid:r.full_paid||false,productionStatus:r.production_status||"",remind90:r.remind90||false})));
+      setShoots((s||[]).map(r=>({id:r.id,date:r.date,clientName:r.client_name,phone:r.phone||"",type:r.type,location:r.location||"",price:r.price,deposit:r.deposit||0,paymentStatus:r.payment_status||"לא שולם",notes:r.notes||"",calendarEventId:r.calendar_event_id,package:r.package||"",drone:r.drone||false,vintage:r.vintage||false,depositPaid:r.deposit_paid||false,fullPaid:r.full_paid||false,productionStatus:r.production_status||"",remind90:r.remind90||false,needsGcalSync:r.needs_gcal_sync||false})));
       setExpenses((e||[]).map(r=>({id:r.id,month:r.month,description:r.description,amount:r.amount})));
     }catch(err){ console.error('load error',err); }
     setLoading(false);
@@ -762,7 +762,7 @@ export default function App() {
 
   function connectGcal(){
     if(!gcalReady||!window.google){ showToast("Google עדיין נטען","error"); return; }
-    const tc=window.google.accounts.oauth2.initTokenClient({ client_id:GCAL_CLIENT_ID,scope:GCAL_SCOPES,callback:(r)=>{ if(r.access_token){ setGcalToken(r.access_token); localStorage.setItem("tpv_gcal",r.access_token); showToast("חובר ל-Google Calendar ✓"); setSettingsOpen(false); } else showToast("שגיאה","error"); } });
+    const tc=window.google.accounts.oauth2.initTokenClient({ client_id:GCAL_CLIENT_ID,scope:GCAL_SCOPES,callback:(r)=>{ if(r.access_token){ setGcalToken(r.access_token); localStorage.setItem("tpv_gcal",r.access_token); showToast("חובר ל-Google Calendar ✓"); setSettingsOpen(false); setGcalExpired(false); setTimeout(()=>syncPendingGcal(r.access_token),500); } else showToast("שגיאה","error"); } });
     tc.requestAccessToken();
   }
 
@@ -770,9 +770,27 @@ export default function App() {
     if(!gcalToken) return null;
     try{
       const r=await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events",{method:"POST",headers:{Authorization:`Bearer ${gcalToken}`,"Content-Type":"application/json"},body:JSON.stringify({summary:`🎬 ${shoot.clientName}`,location:shoot.location||"",description:`סוג: ${shoot.type}\nסכום: ${fmt(shoot.price)}\nמקדמה: ${fmt(shoot.deposit||0)}\nטלפון: ${shoot.phone||""}`,start:{date:shoot.date},end:{date:shoot.date},colorId:"11"})});
-      if(r.status===401){setGcalToken(null);localStorage.removeItem("tpv_gcal");setGcalExpired(true);return null;}
+      if(r.status===401){setGcalToken(null);localStorage.removeItem("tpv_gcal");setGcalExpired(true);return "NEEDS_SYNC";}
       const d=await r.json(); return d.id||null;
-    }catch{return null;}
+    }catch{return "NEEDS_SYNC";}
+  }
+
+  async function syncPendingGcal(token){
+    const pending = shoots.filter(s=>s.needsGcalSync&&!s.calendarEventId);
+    if(pending.length===0) return;
+    let synced=0;
+    for(const shoot of pending){
+      try{
+        const r=await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events",{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify({summary:`🎬 ${shoot.clientName}`,location:shoot.location||"",description:`סוג: ${shoot.type}\nסכום: ${fmt(shoot.price)}`,start:{date:shoot.date},end:{date:shoot.date},colorId:"11"})});
+        if(r.status===401) break;
+        const d=await r.json();
+        const calId=d.id||null;
+        await sbFetch(`shoots?id=eq.${shoot.id}`,{method:"PATCH",body:JSON.stringify({calendar_event_id:calId,needs_gcal_sync:false})},authToken);
+        setShoots(prev=>prev.map(s=>s.id===shoot.id?{...s,calendarEventId:calId,needsGcalSync:false}:s));
+        synced++;
+      }catch{}
+    }
+    if(synced>0) showToast(`סונכרנו ${synced} אירועים ל-Google Calendar ✓`);
   }
 
   async function gcalUpdate(shoot){
@@ -799,9 +817,12 @@ export default function App() {
       try{
         const res=await sbFetch("shoots",{method:"POST",body:JSON.stringify({date:form.date,client_name:form.clientName,phone:form.phone,type:form.type,location:form.location,price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,payment_status:"לא שולם",notes:form.notes,calendar_event_id:calId,package:form.package,drone:form.drone,vintage:form.vintage,deposit_paid:form.depositPaid||false,full_paid:form.fullPaid||false,production_status:"",remind90:form.remind90||false,user_id:user?.id})},authToken);
         const newId=res?.[0]?.id??null;
-        const newShoot={id:newId,date:form.date,clientName:form.clientName,phone:form.phone||"",type:form.type,location:form.location||"",price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,paymentStatus:"לא שולם",notes:form.notes||"",calendarEventId:calId,package:form.package||"",drone:form.drone||false,vintage:form.vintage||false,depositPaid:form.depositPaid||false,fullPaid:form.fullPaid||false,productionStatus:"",remind90:form.remind90||false};
+        const needsSync=calId==="NEEDS_SYNC";
+        const realCalId=needsSync?null:calId;
+        if(needsSync&&newId) await sbFetch(`shoots?id=eq.${newId}`,{method:"PATCH",body:JSON.stringify({needs_gcal_sync:true})},authToken);
+        const newShoot={id:newId,date:form.date,clientName:form.clientName,phone:form.phone||"",type:form.type,location:form.location||"",price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,paymentStatus:"לא שולם",notes:form.notes||"",calendarEventId:realCalId,package:form.package||"",drone:form.drone||false,vintage:form.vintage||false,depositPaid:form.depositPaid||false,fullPaid:form.fullPaid||false,productionStatus:"",remind90:form.remind90||false,needsGcalSync:needsSync};
         setShoots([newShoot,...shoots]);
-        showToast(gcalToken&&calId?"נשמר + לוח שנה ✓":"נשמר ✓"); setModal(null);
+        showToast(needsSync?"נשמר ✓ (יסונכרן ב-Google כשתתחבר מחדש)":realCalId?"נשמר + לוח שנה ✓":"נשמר ✓"); setModal(null);
       }catch(err){ console.error("shoot save error",err); showToast("שגיאה: "+(err?.message||""),"error"); return; }
     }
     setForm(initialForm);
@@ -966,6 +987,12 @@ export default function App() {
       </div>
 
       {/* GCal expired banner */}
+      {(()=>{const pending=shoots.filter(s=>s.needsGcalSync).length; return pending>0&&!gcalExpired?(
+        <div style={{background:"linear-gradient(135deg,#fef9c3,#fef3c7)",borderBottom:"1px solid #fde68a",padding:"8px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,zIndex:45,position:"sticky",top:56}}>
+          <span style={{fontSize:13,color:"#92400e",fontWeight:600}}>🔄 {pending} אירוע{pending>1?"ים":""} ממתינ{pending>1?"ים":""} לסנכרון עם Google Calendar</span>
+          <button onClick={()=>connectGcal()} style={{background:"#f59e0b",color:"#fff",border:"none",borderRadius:8,padding:"6px 14px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap"}}>סנכרן</button>
+        </div>
+      ):null;})()}
       {gcalExpired&&(
         <div style={{background:"linear-gradient(135deg,#fef2f2,#fee2e2)",borderBottom:"1px solid #fecaca",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,zIndex:45,position:"sticky",top:56}}>
           <span style={{fontSize:13,color:"#991b1b",fontWeight:600}}>⚠️ החיבור ל-Google Calendar פג</span>
