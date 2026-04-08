@@ -33,7 +33,7 @@ async function sbAuth(action, body) {
 }
 
 const SHOOT_TYPES = ["חתונות / אירועים", "תוכן לרשתות חברתיות", "פרסומות / קומרשיאל", "קליפים מוזיקליים", "תדמית לעסקים", "אחר"];
-const initialForm = { date: "", clientName: "", location: "", phone: "05", price: "", deposit: "", type: "חתונות / אירועים", notes: "", calendarEventId: null };
+const initialForm = { date: "", clientName: "", location: "", phone: "05", price: "", deposit: "", type: "חתונות / אירועים", notes: "", calendarEventId: null, package: "", drone: false, vintage: false };
 
 function fmt(n) { return Number(n || 0).toLocaleString("he-IL") + " ₪"; }
 function getCurrentMonth() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; }
@@ -245,7 +245,7 @@ export default function App() {
     setLoading(true);
     try{
       const [s,e]=await Promise.all([sbFetch("shoots?order=date.desc",{},authToken),sbFetch("expenses?order=created_at.desc",{},authToken)]);
-      setShoots((s||[]).map(r=>({id:r.id,date:r.date,clientName:r.client_name,phone:r.phone||"",type:r.type,location:r.location||"",price:r.price,deposit:r.deposit||0,paymentStatus:r.payment_status||"לא שולם",notes:r.notes||"",calendarEventId:r.calendar_event_id})));
+      setShoots((s||[]).map(r=>({id:r.id,date:r.date,clientName:r.client_name,phone:r.phone||"",type:r.type,location:r.location||"",price:r.price,deposit:r.deposit||0,paymentStatus:r.payment_status||"לא שולם",notes:r.notes||"",calendarEventId:r.calendar_event_id,package:r.package||"",drone:r.drone||false,vintage:r.vintage||false})));
       setExpenses((e||[]).map(r=>({id:r.id,month:r.month,description:r.description,amount:r.amount})));
     }catch(err){ console.error('load error',err); }
     setLoading(false);
@@ -300,15 +300,15 @@ export default function App() {
       if(gcalToken){ if(calId) await gcalUpdate({...form,calendarEventId:calId}); else calId=await gcalCreate(form); }
       const updated={...form,id:editId,calendarEventId:calId};
       try{
-        await sbFetch(`shoots?id=eq.${editId}`,{method:"PATCH",body:JSON.stringify({date:form.date,client_name:form.clientName,phone:form.phone,type:form.type,location:form.location,price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,payment_status:form.paymentStatus||"לא שולם",notes:form.notes,calendar_event_id:calId})},authToken);
+        await sbFetch(`shoots?id=eq.${editId}`,{method:"PATCH",body:JSON.stringify({date:form.date,client_name:form.clientName,phone:form.phone,type:form.type,location:form.location,price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,payment_status:form.paymentStatus||"לא שולם",notes:form.notes,calendar_event_id:calId,package:form.package,drone:form.drone,vintage:form.vintage})},authToken);
         setShoots(shoots.map(s=>s.id===editId?updated:s)); showToast("עודכן ✓"); setModal(null); setView("history");
       }catch{ showToast("שגיאה","error"); return; }
       setEditId(null);
     } else {
       let calId=gcalToken?await gcalCreate(form):null;
       try{
-        const res=await sbFetch("shoots",{method:"POST",body:JSON.stringify({date:form.date,client_name:form.clientName,phone:form.phone,type:form.type,location:form.location,price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,payment_status:"לא שולם",notes:form.notes,calendar_event_id:calId})},authToken);
-        setShoots([{id:res[0].id,...form,paymentStatus:"לא שולם",calendarEventId:calId},...shoots]);
+        const res=await sbFetch("shoots",{method:"POST",body:JSON.stringify({date:form.date,client_name:form.clientName,phone:form.phone,type:form.type,location:form.location,price:parseFloat(form.price)||0,deposit:parseFloat(form.deposit)||0,payment_status:"לא שולם",notes:form.notes,calendar_event_id:calId,package:form.package,drone:form.drone,vintage:form.vintage})},authToken);
+        setShoots([{id:res[0].id,...form,paymentStatus:"לא שולם",calendarEventId:calId,package:form.package,drone:form.drone,vintage:form.vintage},...shoots]);
         showToast(gcalToken&&calId?"נשמר + לוח שנה ✓":"נשמר ✓"); setModal(null);
       }catch{ showToast("שגיאה","error"); return; }
     }
@@ -601,6 +601,45 @@ export default function App() {
           <div style={S.typeGrid}>
             {SHOOT_TYPES.map(t=>(
               <button key={t} style={{...S.typeChip,...(form.type===t?S.typeChipActive:{})}} onClick={()=>setForm({...form,type:t})}>{t}</button>
+            ))}
+          </div>
+        </FormGroup>
+        <FormGroup label="חבילה">
+          <div style={{display:"flex",gap:10}}>
+            {["חבילה 1","חבילה 2"].map(p=>(
+              <button key={p} onClick={()=>{
+                const isP2 = p==="חבילה 2";
+                setForm({...form,package:form.package===p?"":p, drone:isP2?true:form.drone, vintage:isP2?true:form.vintage});
+              }} style={{
+                flex:1,padding:"11px 0",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",
+                border:form.package===p?"2px solid #1d4ed8":"1px solid rgba(226,232,240,0.8)",
+                background:form.package===p?"rgba(239,246,255,0.95)":"rgba(248,250,252,0.9)",
+                color:form.package===p?"#1d4ed8":"#64748b",
+                boxShadow:form.package===p?"0 2px 8px rgba(29,78,216,0.15)":"none",
+                transition:"all 0.15s"
+              }}>{p}</button>
+            ))}
+          </div>
+        </FormGroup>
+        <FormGroup label="תוספות">
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {[{key:"drone",label:"צילום רחפן"},{key:"vintage",label:"צילום וינטג׳ בקלטת"}].map(item=>(
+              <button key={item.key} onClick={()=>setForm({...form,[item.key]:!form[item.key]})} style={{
+                display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:12,
+                background:form[item.key]?"rgba(239,246,255,0.95)":"rgba(248,250,252,0.9)",
+                border:form[item.key]?"1px solid #bfdbfe":"1px solid rgba(226,232,240,0.8)",
+                cursor:"pointer",fontFamily:"inherit",textAlign:"right",width:"100%",transition:"all 0.15s"
+              }}>
+                <div style={{
+                  width:22,height:22,borderRadius:6,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",
+                  background:form[item.key]?"#1d4ed8":"#fff",
+                  border:form[item.key]?"2px solid #1d4ed8":"2px solid #cbd5e1",
+                  transition:"all 0.15s"
+                }}>
+                  {form[item.key]&&<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                </div>
+                <span style={{fontSize:14,fontWeight:600,color:form[item.key]?"#1d4ed8":"#334155"}}>{item.label}</span>
+              </button>
             ))}
           </div>
         </FormGroup>
